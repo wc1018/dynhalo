@@ -1,1 +1,2 @@
-/DynBaLSS.code-workspace
+*.code-workspace
+*.egg-info
