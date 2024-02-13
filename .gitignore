@@ -1,2 +1,3 @@
 *.code-workspace
 *.egg-info
+*.ini
