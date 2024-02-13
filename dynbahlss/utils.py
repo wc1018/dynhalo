@@ -1,7 +1,10 @@
+
 from typing import Callable, Union
 from datetime import timedelta
 from time import time
-import numpy as np
+
+import os
+import numpy
 
 
 class COLS:
@@ -39,10 +42,20 @@ def timer(
     return wrapper
 
 
-def replace_val(var_io: np.ndarray,
-                idx: Union[np.ndarray, list],
+def mkdir(path, verbose=False):
+    if verbose:
+        print(path)
+    if not os.path.exists(os.path.abspath(path)):
+        os.mkdir(os.path.abspath(path))
+    if verbose:
+        print(f"Directory created at {os.path.exists(os.path.abspath(path))}")
+    return
+
+
+def replace_val(var_io: numpy.ndarray,
+                idx: Union[numpy.ndarray, list],
                 value: Union[int, float],
-                ) -> np.ndarray:
+                ) -> numpy.ndarray:
     '''Changes the values of 'var_io' by placing 'value' in all elements of 
     'idx'
 
