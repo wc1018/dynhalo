@@ -3,7 +3,7 @@ import glob
 import re
 from setuptools import setup, find_packages
 
-project_name = 'dynbahlss'
+project_name = 'dhm'
 sources = glob.glob(os.path.join(project_name,'*.py'))
 
 # auto-updating version code taken from RadVel
