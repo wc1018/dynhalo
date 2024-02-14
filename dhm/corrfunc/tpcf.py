@@ -11,6 +11,7 @@ filterwarnings('ignore')
 __all__ = ["generate_bins", "generate_bin_str",
            "partition_box", "process_DD_pairs"]
 
+
 def generate_bins(
     bmin: float,
     bmax: float,
@@ -85,7 +86,8 @@ def generate_bin_str(bin_edges: Union[List[float], Tuple[float]]) -> str:
     if type(bin_edges) in [list, tuple] and len(bin_edges) == 2:
         return f'{bin_edges[0]:.2f}-{bin_edges[-1]:.2f}'
     else:
-        raise ValueError("bin_edges must be a list of floats and len=2: [min, max]")
+        raise ValueError(
+            "bin_edges must be a list of floats and len=2: [min, max]")
 
 
 def partition_box(data: np.ndarray, boxsize: float, gridsize: float) -> List[float]:
@@ -104,7 +106,7 @@ def partition_box(data: np.ndarray, boxsize: float, gridsize: float) -> List[flo
     Returns
     -------
     List[float]
-        
+
     """
     # Number of grid cells per side.
     cells_per_side = int(math.ceil(boxsize / gridsize))
@@ -116,7 +118,8 @@ def partition_box(data: np.ndarray, boxsize: float, gridsize: float) -> List[flo
     # This list stores all of the particles original IDs in a convenient 3D
     # list. It is kind of a pointer of size n_cpd**3
     data_cell_id = [[] for _ in range(cells_per_side**3)]
-    cells = cells_per_side**2 * grid_id[:, 0] + cells_per_side * grid_id[:, 1] + grid_id[:, 2]
+    cells = cells_per_side**2 * grid_id[:, 0] + \
+        cells_per_side * grid_id[:, 1] + grid_id[:, 2]
     for cell in tqdm(range(np.size(data, 0)), desc="Partitioning box", ncols=100, colour='blue'):
         data_cell_id[cells[cell]].append(cell)
 
@@ -167,7 +170,7 @@ def process_DD_pairs(
     Returns
     -------
     np.ndarray
-        _description_
+        Data-data pair counts
     """
     # Number of grid cells per side
     cells_per_side = int(math.ceil(boxsize / gridsize))
@@ -178,7 +181,7 @@ def process_DD_pairs(
     zeros = np.zeros(radial_edges.size - 1)
 
     # Pair counting for all elements in each cell
-    for cell in tqdm(range(n_cells), desc="Pair counting", ncols=100, 
+    for cell in tqdm(range(n_cells), desc="Pair counting", ncols=100,
                      colour='green'):
         # Get data 1 in cell
         xd1 = data_1[data_1_id[cell], 0]
@@ -205,7 +208,7 @@ def process_DD_pairs(
             wd2 = 1.0
 
         # Data pair counting if there are elements in cell
-        if np.size(xd1) != 0: # and np.size(xd2) != 0:
+        if np.size(xd1) != 0:  # and np.size(xd2) != 0:
             autocorr = 0
             # Data pair counting
             DD_counts = countDD(
@@ -232,7 +235,7 @@ def process_DD_pairs(
     return dd_pairs
 
 
-def tpck_with_jk_from_DD(
+def tpcf_jk(
     data_1: np.ndarray,
     data_2: np.ndarray,
     data_1_id: list,
@@ -241,50 +244,89 @@ def tpck_with_jk_from_DD(
     boxsize: float,
     gridsize: float,
 ) -> Tuple[np.ndarray]:
-    # Set up bins
-    nbins = radial_edges.size - 1
+    """Ultra-fast correlation function estimation
 
-    n_cpd = int(math.ceil(boxsize / gridsize))  # Number of cells per dimension
-    n_jk = n_cpd**3  # Number of jackknife samples
-    d1tot = np.size(data_1, 0)  # Number of objects in d1
-    d2tot = np.size(data_2, 0)  # Number of objects in d2
-    Vbox = boxsize**3  # Volume of box
-    Vshell = np.zeros(nbins)  # Volume of spherical shell
+    Parameters
+    ----------
+    data_1 : np.ndarray
+        The array of X/Y/Z positions for the first set of points
+    data_2 : np.ndarray
+        The array of X/Y/Z positions for the second set of points
+    data_1_id : list
+        Box partitioning 3D grid.
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    dd_pairs : np.ndarray
+        _description_
+    boxsize : float
+        Size of simulation box
+    gridsize : float
+        Size of sub-volume or cell of the box
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Returns a tuple with `(xi, xi_samples, xi_mean, cov)`, where `xi` is the 
+        total correlation function measured directly on the full simulation box.
+        `xi_samples` is an array of shape `(Njk, Nbins)` with the Njk samples of 
+        the correlation function. `xi_mean` and `xi_cov` are the mean and 
+        covariance of `xi_samples`.
+    """
+    # Number of radial bins
+    n_bins = radial_edges.shape[0] - 1
+
+    # Number of cells per dimension
+    cells_per_side = int(math.ceil(boxsize / gridsize))
+
+    # Number of jackknife samples. One sample per cell.
+    n_jk_samples = cells_per_side**3
+
+    # Number of objects in d1 and d2
+    # TODO: Check if data_1 and data_2 are striclty necessary.
+    n_obj_d1 = np.size(data_1, 0)
+    n_obj_d2 = np.size(data_2, 0)
+
+    # Volume of the box and spherical shells.
+    volume_box = boxsize ** 3
+    volume_shell = np.zeros(n_bins)
     # Vjk = (N - 1) / N * Vbox
-    for m in range(nbins):
-        Vshell[m] = (
-            4.0 / 3.0 * np.pi *
-            (radial_edges[m + 1] ** 3 - radial_edges[m] ** 3)
-        )
-    n1 = float(d1tot) / Vbox  # Number density of d2
-    n2 = float(d2tot) / Vbox  # Number density of d2
+    for i in range(n_bins):
+        volume_shell[i] = radial_edges[i + 1] ** 3 - radial_edges[i] ** 3
+        volume_shell[i] *= 4.0 * np.pi / 3.0
 
-    # Some arrays
-    ddpairs_removei = np.zeros((n_jk, nbins))
-    xi = np.zeros(nbins)
-    xi_i = np.zeros((n_jk, nbins))
-    meanxi_i = np.zeros(nbins)
-    cov = np.zeros((nbins, nbins))
+    # Number densities
+    num_dens_d1 = float(n_obj_d1) / volume_box
+    num_dens_d2 = float(n_obj_d2) / volume_box
 
-    ddpairs = np.sum(dd_pairs, axis=0)
+    # Sum all data pairs over the same axis
+    dd_pairs_total = np.sum(dd_pairs, axis=0)
 
-    ddpairs_removei = ddpairs[None, :] - dd_pairs
-    for cell in range(n_jk):
-        d1tot_s1 = np.size(data_1, 0) - np.size(data_1[data_1_id[cell]], 0)
+    # Compute the correlation function for each jk sample. That is, remove the
+    # cell from data and compute the correlation function
+    xi_samples = np.zeros((n_jk_samples, n_bins))
+    dd_pairs_removed_samples = dd_pairs_total[None, :] - dd_pairs
+    for sample in range(n_jk_samples):
+        # Number of objects in d1 after removing all objects in sample.
+        d1tot_s1 = n_obj_d1 - np.size(data_1[data_1_id[sample]], 0)
+
         # xi_i[cell] = dd_pairs_i[cell] / (n1 * n2 * Vjk * Vshell) - 1
-        xi_i[cell] = ddpairs_removei[cell] / (d1tot_s1 * n2 * Vshell) - 1
+        xi_samples[sample] = dd_pairs_removed_samples[sample] / \
+            (d1tot_s1 * num_dens_d2 * volume_shell) - 1
 
-    # Compute mean xi from all jk samples
-    for i in range(nbins):
-        meanxi_i[i] = np.mean(xi_i[:, i])
+    # Compute mean correlation function from all jk samples
+    # for i in range(n_bins):
+        xi_mean[i] = np.mean(xi_samples[:, i])
+    xi_mean = np.mean(xi_samples[:, i], axis=1)
 
-    # Compute covariance matrix
-    cov = (float(n_jk) - 1.0) * np.cov(xi_i.T, bias=True)
+    # Compute covariance matrix of the radial bins using all jk samples
+    xi_cov = (float(n_jk_samples) - 1.0) * np.cov(xi_samples.T, bias=True)
 
-    # Compute the total xi
-    xi = ddpairs / (n1 * n2 * Vbox * Vshell) - 1
+    # Compute the total correlation function from all pairs
+    xi = dd_pairs_total / \
+        (num_dens_d1 * num_dens_d2 * volume_box * volume_shell) - 1
 
-    return xi, xi_i, meanxi_i, cov
+    return xi, xi_samples, xi_mean, xi_cov
 
 
 def cross_tpcf_jk(
@@ -310,7 +352,7 @@ def cross_tpcf_jk(
         nthreads=nthreads,
     )
     # Estimate jackknife samples of the tpcf
-    xi, xi_i, mean_xi_i, cov = tpck_with_jk_from_DD(
+    xi, xi_i, mean_xi_i, cov = tpcf_jk()(
         data_1=data_1,
         data_2=data_2,
         data_1_id=data_1_id,
