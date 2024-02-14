@@ -132,8 +132,43 @@ def process_DD_pairs(
     gridsize: float,
     weights_1=None,
     weights_2=None,
-    nthreads: int = 16,
+    nthreads: int = 4,
 ) -> np.ndarray:
+    """Counts data-data pais by using pre-partitiones box into a 3D grid. 
+    Corrfunc does the heavy lifting. Doc is taken from Corrfunc.theory.DD
+
+    Parameters
+    ----------
+    data_1 : np.ndarray
+        The array of X/Y/Z positions for the first set of points. Calculations 
+        are done in the precision of the supplied arrays.
+    data_2 : np.ndarray
+        The array of X/Y/Z positions for the second set of points. Calculations 
+        are done in the precision of the supplied arrays.
+    data_1_id : list
+        Box partitioning 3D grid.
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    boxsize : float
+        Size of simulation box
+    gridsize : float
+        Size of sub-volume or cell of the box
+    weights_1 : array_like, real (float/double), optional
+        A scalar, or an array of weights of shape `(n_weights, n_positions)` or 
+        `(n_positions,)`. If `None` will be set to uniform weights. 
+        By default `None`
+    weights_2 : array_like, real (float/double), optional
+        Same as `weights_1` but for `data_2`, by default None
+    nthreads : int, optional
+        The number of OpenMP threads to use. Has no effect if OpenMP was not 
+        enabled during library compilation, by default 4
+
+    Returns
+    -------
+    np.ndarray
+        _description_
+    """
     # Number of grid cells per side
     cells_per_side = int(math.ceil(boxsize / gridsize))
     n_cells = cells_per_side**3
@@ -143,7 +178,8 @@ def process_DD_pairs(
     zeros = np.zeros(radial_edges.size - 1)
 
     # Pair counting for all elements in each cell
-    for cell in tqdm(range(n_cells), desc="Pair counting", ncols=100, colour='green'):
+    for cell in tqdm(range(n_cells), desc="Pair counting", ncols=100, 
+                     colour='green'):
         # Get data 1 in cell
         xd1 = data_1[data_1_id[cell], 0]
         yd1 = data_1[data_1_id[cell], 1]
