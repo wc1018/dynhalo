@@ -52,15 +52,24 @@ def test_generate_bin_str():
     assert tpcf.generate_bin_str([0, 1]) == '0.00-1.00'
     assert tpcf.generate_bin_str((0, 1)) == '0.00-1.00'
 
-# Generalized N-dimensional products
-# Taken from https://stackoverflow.com/questions/11144513/
-# Answer by Nico Schlömer
-# NOTE: Updated for numpy > 1.25
-
 
 def cartesian_product(arrays: List[numpy.ndarray]):
+    """Generalized N-dimensional products
+    Taken from https://stackoverflow.com/questions/11144513/
+    Answer by Nico Schlömer
+    Updated for numpy > 1.25
+
+    Parameters
+    ----------
+    arrays : List[numpy.ndarray]
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     la = len(arrays)
-    # dtype = np.find_common_type([a.dtype for a in arrays], [])
     dtype = numpy.result_type(*[a.dtype for a in arrays])
     arr = numpy.empty([len(a) for a in arrays] + [la], dtype=dtype)
     for i, a in enumerate(numpy.ix_(*arrays)):
@@ -87,7 +96,7 @@ def test_cartesian_product():
     assert len(cart_prod_1) == n_points
     assert len(cart_prod_2) == n_points*n_points
     assert len(cart_prod_3) == n_points*n_points*n_points
-    # Each element has shape (n, 1)
+    # Each element has shape (n,)
     assert cart_prod_1[0].shape == (1,)
     assert cart_prod_2[0].shape == (2,)
     assert cart_prod_3[0].shape == (3,)
@@ -106,7 +115,10 @@ def test_partition_box():
     n_pos = numpy.int_(cartesian_product([n_range, n_range, n_range]))
     data_pos = gridsize * (n_pos + 0.5)
 
-    sorted_data = tpcf.partition_box(data=data_pos, boxsize=boxsize, gridsize=gridsize)
-    
+    sorted_data = tpcf.partition_box(
+        data=data_pos,
+        boxsize=boxsize, 
+        gridsize=gridsize
+    )
+
     assert len(sorted_data) == nside**3
-    
