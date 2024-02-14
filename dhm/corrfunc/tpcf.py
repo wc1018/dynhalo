@@ -9,7 +9,7 @@ from tqdm import tqdm
 filterwarnings('ignore')
 
 __all__ = ["generate_bins", "generate_bin_str",
-           "partition_box"]
+           "partition_box", "process_DD_pairs"]
 
 def generate_bins(
     bmin: float,
@@ -89,6 +89,23 @@ def generate_bin_str(bin_edges: Union[List[float], Tuple[float]]) -> str:
 
 
 def partition_box(data: np.ndarray, boxsize: float, gridsize: float) -> List[float]:
+    """Sorts all data points into a 3D grid with `cells per side = boxsize / gridsize`
+
+    Parameters
+    ----------
+    data : np.ndarray
+        `(N, d)` array with all data points' coordinates, where `N` is the 
+        number of data points and `d` the dimensions
+    boxsize : float
+        Simulation box size (per side)
+    gridsize : float
+        Grid size (per side)
+
+    Returns
+    -------
+    List[float]
+        
+    """
     # Number of grid cells per side.
     cells_per_side = int(math.ceil(boxsize / gridsize))
     # Grid ID for each data point.
@@ -118,15 +135,15 @@ def process_DD_pairs(
     nthreads: int = 16,
 ) -> np.ndarray:
     # Number of grid cells per side
-    n_cpd = int(math.ceil(boxsize / gridsize))
+    cells_per_side = int(math.ceil(boxsize / gridsize))
 
     # Create pairs list
-    ddpairs_i = np.zeros((n_cpd**3, radial_edges.size - 1))
+    ddpairs_i = np.zeros((cells_per_side**3, radial_edges.size - 1))
     zeros = np.zeros(radial_edges.size - 1)
 
     # Pair counting
     # Loop for each minibox
-    for s1 in tqdm(range(n_cpd**3), desc="Pair counting", ncols=100, colour='green'):
+    for s1 in tqdm(range(cells_per_side**3), desc="Pair counting", ncols=100, colour='green'):
         # Get data1 box
         xd1 = data_1[data_1_id[s1], 0]
         yd1 = data_1[data_1_id[s1], 1]
