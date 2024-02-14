@@ -1,33 +1,48 @@
-
-from typing import Callable, Union
+# -*- coding: utf-8 -*-
+""" Some utility routines and constants
+"""
+import os
+from dataclasses import dataclass
 from datetime import timedelta
 from time import time
+from typing import Callable
 
-import os
-import numpy
+__all__ = ["timer, mkdir"]
 
 
+@dataclass(frozen=True)
 class COLS:
-    HEADER = "\033[95m"
-    OKBLUE = "\033[94m"
-    OKCYAN = "\033[96m"
-    OKGREEN = "\033[92m"
-    WARNING = "\033[93m"
-    FAIL = "\033[91m"
-    ENDC = "\033[0m"
-    BOLD = "\033[1m"
-    UNDERLINE = "\033[4m"
-    BULLET = "\u25CF"
+    """
+    """
+    HEADER: str = "\033[95m"
+    OKBLUE: str = "\033[94m"
+    OKCYAN: str = "\033[96m"
+    OKGREEN: str = "\033[92m"
+    WARNING: str = "\033[93m"
+    FAIL: str = "\033[91m"
+    ENDC: str = "\033[0m"
+    BOLD: str = "\033[1m"
+    UNDERLINE: str = "\033[4m"
+    BULLET: str = "\u25CF"
 
 
 OKGOOD = f"{COLS.OKGREEN}{COLS.BULLET}{COLS.ENDC} "
 FAIL = f"{COLS.FAIL}{COLS.BULLET}{COLS.ENDC} "
 
 
-def timer(
-    procedure: Callable,
-) -> Callable:
-    """Decorator that prints the procedure's execution time."""
+def timer(procedure: Callable) -> Callable:
+    """Decorator that prints the procedure's execution time
+
+    Parameters
+    ----------
+    procedure : Callable
+        Any callable
+
+    Returns
+    -------
+    Callable
+        Returns callable object/return value
+    """
 
     def wrapper(*args, **kwargs):
         start = time()
@@ -42,11 +57,29 @@ def timer(
     return wrapper
 
 
-def mkdir(path, verbose=False):
+def mkdir(path: str, verbose: bool = False) -> None:
+    """Checks if a path exists and creates a directory in path if not.
+
+    Parameters
+    ----------
+    path : str
+        Path where directory should exist. 
+    verbose : bool, optional
+        Whether to print info on directory creation process, by default False
+
+    Returns
+    -------
+    None
+    """
     if verbose:
         print(path)
     if not os.path.exists(os.path.abspath(path)):
+        print("Creating directory")
         os.mkdir(os.path.abspath(path))
     if verbose:
         print(f"Directory created at {os.path.exists(os.path.abspath(path))}")
-    return
+    return None
+
+
+if __name__ == '__main__':
+    pass
