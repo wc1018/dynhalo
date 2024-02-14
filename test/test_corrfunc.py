@@ -105,7 +105,7 @@ def test_cartesian_product():
     assert type(cart_prod_float[0][0]) == numpy.float64
 
 
-def gen_data_pos(boxsize: float, gridsize: float) -> numpy.ndarray:
+def gen_data_pos(boxsize, gridsize) -> numpy.ndarray:
     # Populate coordinates with one particle per subbox at the centre in steps
     # of nside between particles
     nside = numpy.int_(numpy.ceil(boxsize / gridsize))
@@ -115,40 +115,8 @@ def gen_data_pos(boxsize: float, gridsize: float) -> numpy.ndarray:
     return data_pos
 
 
-def test_partition_box():
-    boxsize = 100
-    gridsize = 20
-    nside = numpy.int_(numpy.ceil(boxsize / gridsize))
-    data_pos = gen_data_pos(boxsize, gridsize)
-
-    sorted_data = tpcf.partition_box(
-        data=data_pos,
-        boxsize=boxsize,
-        gridsize=gridsize
-    )
-
-    assert len(sorted_data) == nside**3
-    for item in sorted_data:
-        assert len(item) == 1
-
-    # Duplicate data_pos and test
-    data_pos_2 = numpy.vstack([data_pos, data_pos])
-    sorted_data = tpcf.partition_box(
-        data=data_pos_2,
-        boxsize=boxsize,
-        gridsize=gridsize
-    )
-
-    assert len(sorted_data) == nside**3
-    for item in sorted_data:
-        assert len(item) == 2
-
-
-def test_process_DD_pairs():
+def ddpairs(radial_bins, boxsize, gridsize):
     # Generate synthetic data
-    boxsize = 100
-    gridsize = 5
-    nside = numpy.int_(numpy.ceil(boxsize / gridsize))
     data_pos = gen_data_pos(boxsize, gridsize)
     data_pos = numpy.vstack([data_pos, data_pos])
     sorted_data = tpcf.partition_box(
@@ -156,19 +124,10 @@ def test_process_DD_pairs():
         boxsize=boxsize,
         gridsize=gridsize
     )
-
-    # Define radial bins to count pairs
-    rmin = 5
-    rmax = 50
-    n = 10
-    _, redges = tpcf.generate_bins(
-        bmin=rmin,
-        bmax=rmax,
-        nbins=n,
-    )
-
+    
     # Count pairs
-    ddpairs = tpcf.process_DD_pairs(
+    redges = radial_bins[-1]
+    rv = tpcf.process_DD_pairs(
         data_1=data_pos,
         data_2=data_pos,
         data_1_id=sorted_data,
@@ -177,8 +136,64 @@ def test_process_DD_pairs():
         gridsize=gridsize,
         nthreads=16,
     )
+    return rv
 
-    assert len(ddpairs) == nside**3
-    assert len(ddpairs[0]) == n
-    assert ddpairs[0, 0] == 0
-    
+
+class TestTPCF():
+    boxsize = 100
+    gridsize_5 = 5
+    gridsize_20 = 20
+
+    def radial_bins():
+        # Define radial bins to count pairs
+        rmin = 5
+        rmax = 50
+        n = 10
+        rbins, redges = tpcf.generate_bins(
+            bmin=rmin,
+            bmax=rmax,
+            nbins=n,
+        )
+        return rbins, redges
+
+    dd_pairs_fixture = ddpairs(radial_bins(), boxsize, gridsize_5)
+
+    def test_partition_box(self):
+        nside = numpy.int_(numpy.ceil(self.boxsize / self.gridsize_20))
+        data_pos = gen_data_pos(self.boxsize, self.gridsize_20)
+
+        sorted_data = tpcf.partition_box(
+            data=data_pos,
+            boxsize=self.boxsize,
+            gridsize=self.gridsize_20
+        )
+
+        assert len(sorted_data) == nside**3
+        for item in sorted_data:
+            assert len(item) == 1
+
+        # Duplicate data_pos and test
+        data_pos_2 = numpy.vstack([data_pos, data_pos])
+        sorted_data = tpcf.partition_box(
+            data=data_pos_2,
+            boxsize=self.boxsize,
+            gridsize=self.gridsize_20
+        )
+
+        assert len(sorted_data) == nside**3
+        for item in sorted_data:
+            assert len(item) == 2
+
+    def test_process_DD_pairs(self):
+        #  Generate synthetic data
+        nside = numpy.int_(numpy.ceil(self.boxsize / self.gridsize_5))
+        
+        assert len(self.dd_pairs_fixture) == nside**3
+        assert len(self.dd_pairs_fixture[0]) == 10
+        assert self.dd_pairs_fixture[0, 0] == 0
+
+    # def test_tpcf_jk(self, ddpairs):
+
+    #     xi, xi_samples, xi_mean, xi_cov = tpcf.tpcf_jk()
+
+    #     pass
