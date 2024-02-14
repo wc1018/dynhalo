@@ -1,54 +1,94 @@
 import math
-
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from warnings import filterwarnings
 
-from Corrfunc.theory import DD as countDD
 import numpy as np
-
+from Corrfunc.theory import DD as countDD
 from tqdm import tqdm
 
 filterwarnings('ignore')
 
+__all__ = ["generate_bins", "generate_bin_str",
+           "partition_box"]
 
-def get_radial_bins(
-    n_rbins: int,
-    rmin: float,
-    rmax: float,
-    rsoft: float = 0,
+def generate_bins(
+    bmin: float,
+    bmax: float,
+    nbins: int,
+    logspaced: bool = True,
+    soft: float = 0,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Generates radial bins.
+    """Generates equally spaced bins in linear or logarithmic (base 10) space.
 
-    Args:
-        n_rbins (int, optional): number of radial bins below `rmid`.
-            Defaults to 20.
-        n_ext (int, optional): number of radial bins above `rmid`. 
-            Defaults to 7.
-        rmin (int | float, optional): lower radial bound. Defaults to `RSOFT`.
-        rmid (int | float, optional): generated `n_rbins` up to this radial
-            scale. Defaults to 5 Mpc/h.
-        rmax (int | float, optional): upper radial bound. Defaults to 50 Mpc/h. 
-            If `full` is `False`, then the upper radial bound is `rmin`.
-        full (bool, optional): If `True` extends the radial bins from `rmin` to
-            `rmax`. Defaults to True.
+    Parameters
+    ----------
+    bmin : float
+        Minimum or lower bound (inclusive)
+    bmax : float
+        Maximum or upper bound (inclusive)
+    nbins : int
+        Number of bins to generate
+    logspaced : bool, optional
+        Generate log-spaced bins, by default True
+    soft : float, optional
+        If there is softening value, then bmin >= soft, by default 0
 
-    Returns:
-        tuple[np.ndarray, np.ndarray]: radial bins and bin edges.
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        Bins and edges in units of bmin and bmax
     """
-    if rmin < rsoft:
-        rmin = rsoft
+    if bmin < soft:
+        bmin = soft
     # Equally log-spaced bins
-    r_edges = np.logspace(np.log10(rmin), np.log10(rmax),
-                          num=n_rbins + 1, base=10)
+    if bmin == 0:
+        logspaced = False
+
+    if logspaced:
+        r_edges = np.logspace(
+            start=np.log10(bmin),
+            stop=np.log10(bmax),
+            num=nbins + 1,
+            base=10,
+        )
+    else:
+        r_edges = np.linspace(
+            start=bmin,
+            stop=bmax,
+            num=nbins + 1,
+        )
     # Bin middle point
     rbins = 0.5 * (r_edges[1:] + r_edges[:-1])
     return rbins, r_edges
 
 
-def gen_binstr(bin_edges: list) -> list:
-    return [f'{bin_edges[i]:.2f}-{bin_edges[i+1]:.2f}' for i in range(len(bin_edges)-1)]
+def generate_bin_str(bin_edges: Union[List[float], Tuple[float]]) -> str:
+    """Generates a formatted string 'min-max' from bin edges. Intended to be 
+    compatible with HDF dataset naming and LaTeX format.
+
+    Parameters
+    ----------
+    bin_edges : Union[List[float], Tuple[float]]
+        A 2-tuple or list with minimum or lower bound and maximum or upper bound
+        of the bin
+
+    Returns
+    -------
+    str
+        _description_
+
+    Raises
+    ------
+    ValueError
+        If bin_edges is not a list or tuple of length 2.
+    """
+    if type(bin_edges) in [list, tuple] and len(bin_edges) == 2:
+        return f'{bin_edges[0]:.2f}-{bin_edges[-1]:.2f}'
+    else:
+        raise ValueError("bin_edges must be a list of floats and len=2: [min, max]")
 
 
+# TODO: Remove
 def get_mbins(mmin, mmax, mnum, bins=None) -> tuple:
     if bins is not None and (isinstance(bins, list) or isinstance(bins, tuple)):
         if isinstance(bins[-1], int) and len(bins) == 3:
@@ -66,12 +106,12 @@ def get_mbins(mmin, mmax, mnum, bins=None) -> tuple:
         # Bin middle point
         bin_mid = 0.5 * (bin_edges[1:] + bin_edges[:-1])
         # Generate labels for each bin
-    bin_str = gen_binstr(bins)
+    bin_str = generate_bin_str(bins)
 
     return bin_mid, bin_edges, bin_str
 
 
-def partition_box(data: np.ndarray, boxsize: float , gridsize: float) -> List[float]:
+def partition_box(data: np.ndarray, boxsize: float, gridsize: float) -> List[float]:
     # Number of grid cells per side.
     n_cpd = int(math.ceil(boxsize / gridsize))
     # Grid ID for each data point.
