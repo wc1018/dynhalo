@@ -88,46 +88,22 @@ def generate_bin_str(bin_edges: Union[List[float], Tuple[float]]) -> str:
         raise ValueError("bin_edges must be a list of floats and len=2: [min, max]")
 
 
-# TODO: Remove
-def get_mbins(mmin, mmax, mnum, bins=None) -> tuple:
-    if bins is not None and (isinstance(bins, list) or isinstance(bins, tuple)):
-        if isinstance(bins[-1], int) and len(bins) == 3:
-            # Equally log-spaced bins
-            bin_edges = np.linspace(bins[0], bins[1], num=bins[-1] + 1)
-            # Bin middle point
-            bin_mid = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-        else:
-            bin_edges = bins
-            bin_mid = 0.5 * (bins[1:] + bins[:-1])
-        # Generate labels for each bin
-    else:
-        # Grab data from
-        bin_edges = np.linspace(mmin, mmax,num=mnum + 1)
-        # Bin middle point
-        bin_mid = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-        # Generate labels for each bin
-    bin_str = generate_bin_str(bins)
-
-    return bin_mid, bin_edges, bin_str
-
-
 def partition_box(data: np.ndarray, boxsize: float, gridsize: float) -> List[float]:
     # Number of grid cells per side.
-    n_cpd = int(math.ceil(boxsize / gridsize))
+    cells_per_side = int(math.ceil(boxsize / gridsize))
     # Grid ID for each data point.
-    grid_id = data[:] / gridsize
-    grid_id = grid_id.astype(int)
+    grid_id = (data / gridsize).astype(int, copy=False)
     # Correction for points on the edges.
-    grid_id[np.where(grid_id == n_cpd)] = n_cpd - 1
+    grid_id[np.where(grid_id == cells_per_side)] = cells_per_side - 1
 
     # This list stores all of the particles original IDs in a convenient 3D
     # list. It is kind of a pointer of size n_cpd**3
-    data_id = [[] for _ in range(n_cpd**3)]
-    cells = n_cpd**2 * grid_id[:, 0] + n_cpd * grid_id[:, 1] + grid_id[:, 2]
+    data_cell_id = [[] for _ in range(cells_per_side**3)]
+    cells = cells_per_side**2 * grid_id[:, 0] + cells_per_side * grid_id[:, 1] + grid_id[:, 2]
     for cell in tqdm(range(np.size(data, 0)), desc="Partitioning box", ncols=100, colour='blue'):
-        data_id[cells[cell]].append(cell)
+        data_cell_id[cells[cell]].append(cell)
 
-    return data_id
+    return data_cell_id
 
 
 def process_DD_pairs(
