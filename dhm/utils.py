@@ -71,13 +71,21 @@ def mkdir(path: str, verbose: bool = False) -> None:
     -------
     None
     """
-    if verbose:
-        print(path)
-    if not os.path.exists(os.path.abspath(path)):
+    abspath = os.path.abspath(path)
+    isdir = os.path.isdir(abspath)
+    if isdir:
+        if verbose:
+            print(f"Directory exists at {abspath}")
+        return None
+    else:
         print("Creating directory")
-        os.mkdir(os.path.abspath(path))
-    if verbose:
-        print(f"Directory created at {os.path.exists(os.path.abspath(path))}")
+        try:
+            os.mkdir(os.path.abspath(path))
+            if verbose:
+                print(f"Directory created at {abspath}")
+        except:
+            print(f"Directory could not be created at {abspath}")
+            raise
     return None
 
 

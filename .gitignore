@@ -1,3 +1,6 @@
+.vscode
 *.code-workspace
 *.egg-info
 *.ini
+.pytest_cache
+*/__pycache__
