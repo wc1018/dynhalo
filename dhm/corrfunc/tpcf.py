@@ -136,27 +136,27 @@ def process_DD_pairs(
 ) -> np.ndarray:
     # Number of grid cells per side
     cells_per_side = int(math.ceil(boxsize / gridsize))
-
-    # Create pairs list
-    ddpairs_i = np.zeros((cells_per_side**3, radial_edges.size - 1))
+    n_cells = cells_per_side**3
+    # Create pairs list for each radial bin for each cell
+    dd_pairs = np.zeros((n_cells, radial_edges.size - 1))
+    # Fill value if no pairs are found in cell
     zeros = np.zeros(radial_edges.size - 1)
 
-    # Pair counting
-    # Loop for each minibox
-    for s1 in tqdm(range(cells_per_side**3), desc="Pair counting", ncols=100, colour='green'):
-        # Get data1 box
-        xd1 = data_1[data_1_id[s1], 0]
-        yd1 = data_1[data_1_id[s1], 1]
-        zd1 = data_1[data_1_id[s1], 2]
+    # Pair counting for all elements in each cell
+    for cell in tqdm(range(n_cells), desc="Pair counting", ncols=100, colour='green'):
+        # Get data 1 in cell
+        xd1 = data_1[data_1_id[cell], 0]
+        yd1 = data_1[data_1_id[cell], 1]
+        zd1 = data_1[data_1_id[cell], 2]
         if weights_1 is not None:
             if isinstance(weights_1, np.ndarray):
-                wd1 = weights_1[data_1_id[s1]]
+                wd1 = weights_1[data_1_id[cell]]
             else:
                 wd1 = weights_1
         else:
             wd1 = 1.0
 
-        # Get data2 box
+        # Get data 2 in cell
         xd2 = data_2[:, 0]
         yd2 = data_2[:, 1]
         zd2 = data_2[:, 2]
@@ -167,8 +167,9 @@ def process_DD_pairs(
                 wd2 = weights_2
         else:
             wd2 = 1.0
-        # Data pair counting
-        if np.size(xd1) != 0 and np.size(xd2) != 0:
+
+        # Data pair counting if there are elements in cell
+        if np.size(xd1) != 0: # and np.size(xd2) != 0:
             autocorr = 0
             # Data pair counting
             DD_counts = countDD(
@@ -188,11 +189,11 @@ def process_DD_pairs(
                 boxsize=boxsize,
                 verbose=False,
             )["npairs"]
-            ddpairs_i[s1] = DD_counts
+            dd_pairs[cell] = DD_counts
         else:
-            ddpairs_i[s1] = zeros
+            dd_pairs[cell] = zeros
 
-    return ddpairs_i
+    return dd_pairs
 
 
 def tpck_with_jk_from_DD(
@@ -232,10 +233,10 @@ def tpck_with_jk_from_DD(
     ddpairs = np.sum(dd_pairs, axis=0)
 
     ddpairs_removei = ddpairs[None, :] - dd_pairs
-    for s1 in range(n_jk):
-        d1tot_s1 = np.size(data_1, 0) - np.size(data_1[data_1_id[s1]], 0)
-        # xi_i[s1] = dd_pairs_i[s1] / (n1 * n2 * Vjk * Vshell) - 1
-        xi_i[s1] = ddpairs_removei[s1] / (d1tot_s1 * n2 * Vshell) - 1
+    for cell in range(n_jk):
+        d1tot_s1 = np.size(data_1, 0) - np.size(data_1[data_1_id[cell]], 0)
+        # xi_i[cell] = dd_pairs_i[cell] / (n1 * n2 * Vjk * Vshell) - 1
+        xi_i[cell] = ddpairs_removei[cell] / (d1tot_s1 * n2 * Vshell) - 1
 
     # Compute mean xi from all jk samples
     for i in range(nbins):

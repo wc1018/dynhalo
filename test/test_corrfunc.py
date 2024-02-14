@@ -105,20 +105,80 @@ def test_cartesian_product():
     assert type(cart_prod_float[0][0]) == numpy.float64
 
 
-def test_partition_box():
-    boxsize = 100
-    gridsize = 20
+def gen_data_pos(boxsize: float, gridsize: float) -> numpy.ndarray:
     # Populate coordinates with one particle per subbox at the centre in steps
     # of nside between particles
     nside = numpy.int_(numpy.ceil(boxsize / gridsize))
     n_range = numpy.arange(nside, dtype=int)
     n_pos = numpy.int_(cartesian_product([n_range, n_range, n_range]))
     data_pos = gridsize * (n_pos + 0.5)
+    return data_pos
+
+
+def test_partition_box():
+    boxsize = 100
+    gridsize = 20
+    nside = numpy.int_(numpy.ceil(boxsize / gridsize))
+    data_pos = gen_data_pos(boxsize, gridsize)
 
     sorted_data = tpcf.partition_box(
         data=data_pos,
-        boxsize=boxsize, 
+        boxsize=boxsize,
         gridsize=gridsize
     )
 
     assert len(sorted_data) == nside**3
+    for item in sorted_data:
+        assert len(item) == 1
+
+    # Duplicate data_pos and test
+    data_pos_2 = numpy.vstack([data_pos, data_pos])
+    sorted_data = tpcf.partition_box(
+        data=data_pos_2,
+        boxsize=boxsize,
+        gridsize=gridsize
+    )
+
+    assert len(sorted_data) == nside**3
+    for item in sorted_data:
+        assert len(item) == 2
+
+
+def test_process_DD_pairs():
+    # Generate synthetic data
+    boxsize = 100
+    gridsize = 5
+    nside = numpy.int_(numpy.ceil(boxsize / gridsize))
+    data_pos = gen_data_pos(boxsize, gridsize)
+    data_pos = numpy.vstack([data_pos, data_pos])
+    sorted_data = tpcf.partition_box(
+        data=data_pos,
+        boxsize=boxsize,
+        gridsize=gridsize
+    )
+
+    # Define radial bins to count pairs
+    rmin = 5
+    rmax = 50
+    n = 10
+    _, redges = tpcf.generate_bins(
+        bmin=rmin,
+        bmax=rmax,
+        nbins=n,
+    )
+
+    # Count pairs
+    ddpairs = tpcf.process_DD_pairs(
+        data_1=data_pos,
+        data_2=data_pos,
+        data_1_id=sorted_data,
+        radial_edges=redges,
+        boxsize=boxsize,
+        gridsize=gridsize,
+        nthreads=16,
+    )
+
+    assert len(ddpairs) == nside**3
+    assert len(ddpairs[0]) == n
+    assert ddpairs[0, 0] == 0
+    
