@@ -248,10 +248,10 @@ def tpcf_jk(
 
     Parameters
     ----------
-    data_1 : np.ndarray
-        The array of X/Y/Z positions for the first set of points
-    data_2 : np.ndarray
-        The array of X/Y/Z positions for the second set of points
+    n_obj_d1 : int
+        The number of objects/particles/points in the first set of points
+    n_obj_d2 : int
+        The number of objects/particles/points in the second set of points
     data_1_id : list
         Box partitioning 3D grid.
     radial_edges : np.ndarray
@@ -355,8 +355,8 @@ def cross_tpcf_jk(
     )
     # Estimate jackknife samples of the tpcf
     xi, xi_i, mean_xi_i, cov = tpcf_jk()(
-        data_1=data_1,
-        data_2=data_2,
+        data_1=np.size(data_1, 0),
+        data_2=np.size(data_2, 0),
         data_1_id=data_1_id,
         radial_edges=radial_edges,
         dd_pairs=dd_pairs,
