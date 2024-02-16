@@ -1,5 +1,7 @@
 from typing import List
 
+import h5py
+import matplotlib.pyplot as plt
 import numpy
 import pytest
 
@@ -213,4 +215,55 @@ class TestTPCF():
         assert numpy.all(xi < 1) and numpy.all(xi_mean < 1)
         assert numpy.all(numpy.diag(xi_cov) > 0)
         assert numpy.isclose(numpy.linalg.det(xi_cov), 0)
-        
+
+
+class TestTPCFResult:
+
+    def test_halo_tpcf(self):
+
+        test_data_file = 'test/data/test_data_corr_func.hdf5'
+        with h5py.File(test_data_file, 'r') as hdf:
+            res_xi = {}
+            for key in hdf['sample_xi'].keys():
+                res_xi[key] = hdf['sample_xi/'+key][()]
+            halo_pos = hdf['sample_box/halo'][()]
+            part_pos = hdf['sample_box/part'][()]
+
+        rbins_fid = res_xi['r_bins']
+        xi_fid = res_xi['xi']
+        xi_cov_fid = res_xi['xi_cov']
+
+        xi, _, _, xi_cov = tpcf.cross_tpcf_jk(
+            data_1=halo_pos,
+            data_2=part_pos,
+            radial_edges=res_xi['r_edges'],
+            boxsize=1_000,
+            gridsize=250,
+            nthreads=16,
+        )
+
+        plt.title('Test Correlation Function')
+        _, axes = plt.subplots(2, 1, figsize=(3, 4),
+                               gridspec_kw={'hspace': 0})
+        plt.sca(axes[0])
+        plt.errorbar(rbins_fid, rbins_fid**2*xi_fid,
+                     yerr=rbins_fid**2*numpy.sqrt(numpy.diag(xi_cov_fid)),
+                     fmt='.', elinewidth=1, capsize=3, color='k', alpha=0.5,
+                     label='Fiducial')
+        plt.errorbar(rbins_fid, rbins_fid**2*xi,
+                     yerr=rbins_fid**2*numpy.sqrt(numpy.diag(xi_cov)),
+                     fmt='.', elinewidth=1, capsize=3, color='r', alpha=0.5,
+                     label='New')
+        plt.ylabel(r'$r^2\xi_{hm}$')
+        plt.legend(loc='upper right')
+        plt.xscale('log')
+
+        plt.sca(axes[1])
+        plt.plot(rbins_fid, xi/xi_fid, lw=1, color='r', alpha=0.5)
+        plt.hlines(1, 0.9*min(rbins_fid), 1.1*max(rbins_fid), color='k',
+                   ls=':', lw=1)
+        plt.xscale('log')
+        plt.xlabel(r'$r~[{\rm Mpc}/h]$')
+        plt.ylabel(r'$\xi/\xi_{\rm fid}$')
+        plt.tight_layout()
+        plt.savefig('test/img/test_sample_box_xi.png', dpi=150)
