@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy
 import pytest
 
-from dhm.corrfunc import tpcf
+from dhm.corrfunc import tpcf, bins
 
 
 def test_generate_bins():
@@ -15,7 +15,7 @@ def test_generate_bins():
 
     # Check default values. Since bmin=0 and soft=0, bins should NOT be
     # log-spaced.
-    rbins, redges = tpcf.generate_bins(
+    rbins, redges = bins.generate_bins(
         bmin=rmin,
         bmax=rmax,
         nbins=n,
@@ -30,7 +30,7 @@ def test_generate_bins():
 
     # Introduce a softening with log-spaced bins
     soft = 0.5
-    rbins, redges = tpcf.generate_bins(
+    rbins, redges = bins.generate_bins(
         bmin=rmin,
         bmax=rmax,
         nbins=n,
@@ -49,10 +49,10 @@ def test_generate_bin_str():
     # Check for correct input type
     for item in [0, 1., -1., "a", 4+1j, None]:
         with pytest.raises(ValueError):
-            tpcf.generate_bin_str(item)
+            bins.generate_bin_str(item)
 
-    assert tpcf.generate_bin_str([0, 1]) == '0.00-1.00'
-    assert tpcf.generate_bin_str((0, 1)) == '0.00-1.00'
+    assert bins.generate_bin_str([0, 1]) == '0.00-1.00'
+    assert bins.generate_bin_str((0, 1)) == '0.00-1.00'
 
 
 def cartesian_product(arrays: List[numpy.ndarray]):
@@ -124,7 +124,7 @@ def gen_data_pos_random(boxsize, nsamples) -> numpy.ndarray:
 
 def radial_bins(rmin=5, rmax=50, n=10):
     # Define radial bins to count pairs
-    return tpcf.generate_bins(
+    return bins.generate_bins(
         bmin=rmin,
         bmax=rmax,
         nbins=n,
@@ -134,7 +134,7 @@ def radial_bins(rmin=5, rmax=50, n=10):
 def ddpairs(radial_bins, boxsize, gridsize):
     # Generate synthetic data
     data_pos = gen_data_pos_random(boxsize, 10_000)
-    sorted_data = tpcf.partition_box(
+    sorted_data = bins.partition_box(
         data=data_pos,
         boxsize=boxsize,
         gridsize=gridsize
@@ -166,7 +166,7 @@ class TestTPCF():
         nside = numpy.int_(numpy.ceil(self.boxsize / self.grid_coarse))
         data_pos = gen_data_pos_regular(self.boxsize, self.grid_coarse)
 
-        sorted_data = tpcf.partition_box(
+        sorted_data = bins.partition_box(
             data=data_pos,
             boxsize=self.boxsize,
             gridsize=self.grid_coarse
@@ -178,7 +178,7 @@ class TestTPCF():
 
         # Duplicate data_pos and test
         data_pos_2 = numpy.vstack([data_pos, data_pos])
-        sorted_data = tpcf.partition_box(
+        sorted_data = bins.partition_box(
             data=data_pos_2,
             boxsize=self.boxsize,
             gridsize=self.grid_coarse
