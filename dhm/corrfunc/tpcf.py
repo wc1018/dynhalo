@@ -290,7 +290,7 @@ def tpcf_jk(
 
     # Volume of the box and spherical shells.
     volume_box = boxsize ** 3
-    volume_shell = 4.0 / 3.0 * np.pi * (radial_edges[1:] ** 3 - radial_edges[:-1] ** 3)
+    volume_shell = 4.0 / 3.0 * np.pi * np.diff(np.power(radial_edges, 3))
 
     # Number densities
     num_dens_d1 = float(n_obj_d1) / volume_box
@@ -305,12 +305,11 @@ def tpcf_jk(
     dd_pairs_removed_samples = dd_pairs_total[None, :] - dd_pairs
     for sample in range(n_jk_samples):
         # Number of objects in d1 after removing all objects in sample.
-        # d1tot_s1 = n_obj_d1 - np.size(data_1[data_1_id[sample]], 0)
-        d1tot_s1 = n_obj_d1 - np.size(data_1_xx[data_1_id[sample]], 0)
+        d1_total_sample = n_obj_d1 - np.size(data_1_xx[data_1_id[sample]], 0)
 
         # xi_i[cell] = dd_pairs_i[cell] / (n1 * n2 * Vjk * Vshell) - 1
         xi_samples[sample] = dd_pairs_removed_samples[sample] / \
-            (d1tot_s1 * num_dens_d2 * volume_shell) - 1
+            (d1_total_sample * num_dens_d2 * volume_shell) - 1
 
     # Compute mean correlation function from all jk samples
     # for i in range(n_bins):
