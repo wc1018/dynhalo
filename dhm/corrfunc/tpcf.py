@@ -290,11 +290,7 @@ def tpcf_jk(
 
     # Volume of the box and spherical shells.
     volume_box = boxsize ** 3
-    volume_shell = np.zeros(n_bins)
-    # Vjk = (N - 1) / N * Vbox
-    for i in range(n_bins):
-        volume_shell[i] = radial_edges[i + 1] ** 3 - radial_edges[i] ** 3
-        volume_shell[i] *= 4.0 * np.pi / 3.0
+    volume_shell = 4.0 / 3.0 * np.pi * (radial_edges[1:] ** 3 - radial_edges[:-1] ** 3)
 
     # Number densities
     num_dens_d1 = float(n_obj_d1) / volume_box
