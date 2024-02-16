@@ -133,8 +133,8 @@ def process_DD_pairs(
     radial_edges: np.ndarray,
     boxsize: float,
     gridsize: float,
-    weights_1=None,
-    weights_2=None,
+    weights_1 = None,
+    weights_2 = None,
     nthreads: int = 4,
 ) -> np.ndarray:
     """Counts data-data pais by using pre-partitiones box into a 3D grid. 
@@ -335,13 +335,56 @@ def cross_tpcf_jk(
     data_1: np.ndarray,
     data_2: np.ndarray,
     radial_edges: np.ndarray,
+    boxsize: float,
+    gridsize: float,
     weights_1=None,
     weights_2=None,
-    nthreads: int = 16,
+    nthreads: int = 4,
     jk_estimates: bool = True,
 ) -> Tuple[np.ndarray]:
-    # Partition boxes
-    data_1_id = partition_box(data_1)
+    """Compute the cross-correlation function between data 1 and data 2. It is 
+    assumed that data 1 
+
+    Parameters
+    ----------
+     data_1 : np.ndarray
+        The array of X/Y/Z positions for the first set of points. Calculations 
+        are done in the precision of the supplied arrays.
+    data_2 : np.ndarray
+        The array of X/Y/Z positions for the second set of points. Calculations 
+        are done in the precision of the supplied arrays.
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    boxsize : float
+        Size of simulation box
+    gridsize : float
+        Size of sub-volume or cell of the box
+    weights_1 : array_like, real (float/double), optional
+        A scalar, or an array of weights of shape `(n_weights, n_positions)` or 
+        `(n_positions,)`. If `None` will be set to uniform weights. 
+        By default `None`
+    weights_2 : array_like, real (float/double), optional
+        Same as `weights_1` but for `data_2`, by default None
+    nthreads : int, optional
+        The number of OpenMP threads to use. Has no effect if OpenMP was not 
+        enabled during library compilation, by default 4
+    jk_estimates : bool, optional
+        If True returns all the jackknife samples and their mean, by default True
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Total correlation function and covariance matrix. If `jk_estimates` is
+        True, it also returns the jackknife samples and the their mean.
+    """
+    
+    # Partition box
+    data_1_id = partition_box(
+        data=data_1,
+        boxsize=boxsize,
+        gridsize=gridsize,
+    )
 
     # Pair counting. NOTE: data_1 and data_2 must have the same dtype.
     dd_pairs = process_DD_pairs(
@@ -349,17 +392,22 @@ def cross_tpcf_jk(
         data_2=data_2,
         data_1_id=data_1_id,
         radial_edges=radial_edges,
+        boxsize=boxsize,
+        gridsize=gridsize,
         weights_1=weights_1,
         weights_2=weights_2,
         nthreads=nthreads,
     )
+    
     # Estimate jackknife samples of the tpcf
-    xi, xi_i, mean_xi_i, cov = tpcf_jk()(
+    xi, xi_samples, xi_mean, xi_cov = tpcf_jk(
         data_1=np.size(data_1, 0),
         data_2=np.size(data_2, 0),
         data_1_id=data_1_id,
         radial_edges=radial_edges,
         dd_pairs=dd_pairs,
+        boxsize=boxsize,
+        gridsize=gridsize,
     )
 
     # Total correlation function (measured once)
@@ -367,11 +415,11 @@ def cross_tpcf_jk(
     # Mean correlation function (sample mean)
     # Covariance
     if jk_estimates:
-        return xi, xi_i, mean_xi_i, cov
-    # Mean correlation function
+        return xi, xi_samples, xi_mean, xi_cov
+    # Total correlation function (measured once)
     # Covariance
     else:
-        return mean_xi_i, cov
+        return xi, xi_cov
 
 
 if __name__ == "__main__":
