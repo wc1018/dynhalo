@@ -398,11 +398,11 @@ def cross_tpcf_jk(
         weights_2=weights_2,
         nthreads=nthreads,
     )
-    
+
     # Estimate jackknife samples of the tpcf
     xi, xi_samples, xi_mean, xi_cov = tpcf_jk(
-        data_1=np.size(data_1, 0),
-        data_2=np.size(data_2, 0),
+        n_obj_d1=np.size(data_1, 0),
+        n_obj_d2=np.size(data_2, 0),
         data_1_id=data_1_id,
         radial_edges=radial_edges,
         dd_pairs=dd_pairs,
