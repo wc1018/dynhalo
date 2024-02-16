@@ -9,7 +9,8 @@ from tqdm import tqdm
 filterwarnings('ignore')
 
 __all__ = ["generate_bins", "generate_bin_str",
-           "partition_box", "process_DD_pairs"]
+           "partition_box", "process_DD_pairs",
+           "tpcf_jk", "cross_tpcf"]
 
 
 def generate_bins(
@@ -133,8 +134,8 @@ def process_DD_pairs(
     radial_edges: np.ndarray,
     boxsize: float,
     gridsize: float,
-    weights_1 = None,
-    weights_2 = None,
+    weights_1=None,
+    weights_2=None,
     nthreads: int = 4,
 ) -> np.ndarray:
     """Counts data-data pais by using pre-partitiones box into a 3D grid. 
@@ -373,7 +374,7 @@ def cross_tpcf_jk(
         Total correlation function and covariance matrix. If `jk_estimates` is
         True, it also returns the jackknife samples and the their mean.
     """
-    
+
     # Partition box
     data_1_id = partition_box(
         data=data_1,
@@ -415,6 +416,106 @@ def cross_tpcf_jk(
     # Covariance
     else:
         return xi, xi_cov
+
+
+def density(
+    n_obj: int,
+    radii: np.ndarray,
+    radial_edges: np.ndarray,
+    mass: float,
+) -> np.ndarray:
+    n_bins = radial_edges.shape[0] - 1
+    volume_shell = 4.0 / 3.0 * np.pi * np.diff((np.power(radial_edges, 3)))
+
+    # Compute mass density per spherical shell
+    rho = np.zeros(n_bins)
+    for i in range(n_bins):
+        mask = (radial_edges[i] < radii) & (radii <= radial_edges[i + 1])
+        rho[i] = mass * mask.sum() / (n_obj * volume_shell[i])
+    return rho
+
+
+def density_jk(
+    n_obj_d1: int,
+    data_1_id: list,
+    data_1_hid: np.ndarray,
+    radial_data: np.ndarray,
+    radial_edges: np.ndarray,
+    radial_data_1_id: np.ndarray,
+    boxsize: float,
+    gridsize: float,
+    mass: float,
+):
+    n_bins = radial_edges.shape[0] - 1
+    # Number of cells per dimension
+    cells_per_side = int(math.ceil(boxsize / gridsize))
+
+    # Number of jackknife samples. One sample per cell
+    n_jk_samples = cells_per_side**3
+
+    # Data 1 index array
+    # n_obj_d1 = np.size(data_1, 0)
+    data_1_xx = np.arange(n_obj_d1)
+
+    rho_samples = np.zeros((n_jk_samples, n_bins))
+    for sample in tqdm(range(n_jk_samples), desc="Pair counting", ncols=100,
+                       colour='green'):
+        d1_total_sample = np.size(data_1_xx[data_1_id[sample]], 0)
+        mask = np.isin(radial_data_1_id, data_1_hid[data_1_id[sample]])
+
+        rho_samples[sample] = density(
+            n_obj=d1_total_sample,
+            radii=radial_data[mask],
+            radial_edges=radial_edges,
+            mass=mass
+        )
+
+    # Compute mean correlation function from all jk samples
+    rho_mean = np.mean(rho_samples, axis=0)
+
+    # Compute covariance matrix of the radial bins using all jk samples
+    rho_cov = (float(n_jk_samples) - 1.0) * np.cov(rho_samples.T, bias=True) \
+        / np.sqrt(n_obj_d1)
+
+    rho = density(n_obj=n_obj_d1, radii=radial_data,
+                  radial_edges=radial_edges, mass=mass)
+
+    return rho, rho_samples, rho_mean, rho_cov
+
+
+def cross_tpcf_jk_radial(
+    data_1: np.ndarray,
+    data_1_hid: np.ndarray,
+    radial_data: np.ndarray,
+    radial_edges: np.ndarray,
+    radial_data_1_id: np.ndarray,
+    boxsize: float,
+    gridsize: float,
+    mass: float,
+    jk_estimates: bool = True,
+):
+    # Partition box
+    data_1_id = partition_box(
+        data=data_1,
+        box_size=boxsize,
+        grid_size=gridsize,
+    )
+
+    rho, rho_samples, rho_mean, rho_cov = density_jk(
+        n_obj_d1=np.size(data_1, 0),
+        data_1_id=data_1_id,
+        data_1_hid=data_1_hid,
+        radial_data=radial_data,
+        radial_edges=radial_edges,
+        radial_data_1_id=radial_data_1_id,
+        boxsize=boxsize,
+        gridsize=gridsize,
+        mass=mass,
+    )
+    if jk_estimates:
+        return rho, rho_samples, rho_mean, rho_cov
+    else:
+        return rho, rho_cov
 
 
 if __name__ == "__main__":
