@@ -105,7 +105,7 @@ def test_cartesian_product():
     assert type(cart_prod_float[0][0]) == numpy.float64
 
 
-def gen_data_pos(boxsize, gridsize) -> numpy.ndarray:
+def gen_data_pos_regular(boxsize, gridsize) -> numpy.ndarray:
     # Populate coordinates with one particle per subbox at the centre in steps
     # of nside between particles
     nside = numpy.int_(numpy.ceil(boxsize / gridsize))
@@ -115,19 +115,32 @@ def gen_data_pos(boxsize, gridsize) -> numpy.ndarray:
     return data_pos
 
 
+def gen_data_pos_random(boxsize, nsamples) -> numpy.ndarray:
+    data_pos = boxsize * numpy.random.uniform(0, 1, (nsamples, 3))
+    return data_pos
+
+
+def radial_bins(rmin=5, rmax=50, n=10):
+    # Define radial bins to count pairs
+    return tpcf.generate_bins(
+        bmin=rmin,
+        bmax=rmax,
+        nbins=n,
+    )
+
+
 def ddpairs(radial_bins, boxsize, gridsize):
     # Generate synthetic data
-    data_pos = gen_data_pos(boxsize, gridsize)
-    data_pos = numpy.vstack([data_pos, data_pos])
+    data_pos = gen_data_pos_random(boxsize, 10_000)
     sorted_data = tpcf.partition_box(
         data=data_pos,
         boxsize=boxsize,
         gridsize=gridsize
     )
-    
+
     # Count pairs
     redges = radial_bins[-1]
-    rv = tpcf.process_DD_pairs(
+    pairs = tpcf.process_DD_pairs(
         data_1=data_pos,
         data_2=data_pos,
         data_1_id=sorted_data,
@@ -136,36 +149,25 @@ def ddpairs(radial_bins, boxsize, gridsize):
         gridsize=gridsize,
         nthreads=16,
     )
-    return rv
+    return data_pos, sorted_data, redges, pairs
 
 
 class TestTPCF():
+
     boxsize = 100
-    gridsize_5 = 5
-    gridsize_20 = 20
+    # grid_fine = boxsize // 20
+    grid_coarse = boxsize // 4
 
-    def radial_bins():
-        # Define radial bins to count pairs
-        rmin = 5
-        rmax = 50
-        n = 10
-        rbins, redges = tpcf.generate_bins(
-            bmin=rmin,
-            bmax=rmax,
-            nbins=n,
-        )
-        return rbins, redges
-
-    dd_pairs_fixture = ddpairs(radial_bins(), boxsize, gridsize_5)
+    dd_pairs_fixture = ddpairs(radial_bins(), boxsize, grid_coarse)
 
     def test_partition_box(self):
-        nside = numpy.int_(numpy.ceil(self.boxsize / self.gridsize_20))
-        data_pos = gen_data_pos(self.boxsize, self.gridsize_20)
+        nside = numpy.int_(numpy.ceil(self.boxsize / self.grid_coarse))
+        data_pos = gen_data_pos_regular(self.boxsize, self.grid_coarse)
 
         sorted_data = tpcf.partition_box(
             data=data_pos,
             boxsize=self.boxsize,
-            gridsize=self.gridsize_20
+            gridsize=self.grid_coarse
         )
 
         assert len(sorted_data) == nside**3
@@ -177,7 +179,7 @@ class TestTPCF():
         sorted_data = tpcf.partition_box(
             data=data_pos_2,
             boxsize=self.boxsize,
-            gridsize=self.gridsize_20
+            gridsize=self.grid_coarse
         )
 
         assert len(sorted_data) == nside**3
@@ -186,14 +188,29 @@ class TestTPCF():
 
     def test_process_DD_pairs(self):
         #  Generate synthetic data
-        nside = numpy.int_(numpy.ceil(self.boxsize / self.gridsize_5))
+        nside = numpy.int_(numpy.ceil(self.boxsize / self.grid_coarse))
+        _, _, _, dd_pairs = self.dd_pairs_fixture
+
+        assert dd_pairs.shape == (nside**3, 10)
+
+    def test_tpcf_jk(self):
+
+        xi, xi_samples, xi_mean, xi_cov = tpcf.tpcf_jk(
+            n_obj_d1=numpy.size(self.dd_pairs_fixture[0], 0),
+            n_obj_d2=numpy.size(self.dd_pairs_fixture[0], 0),
+            data_1_id=self.dd_pairs_fixture[1],
+            radial_edges=self.dd_pairs_fixture[2],
+            dd_pairs=self.dd_pairs_fixture[-1],
+            boxsize=self.boxsize,
+            gridsize=self.grid_coarse,
+        )
+
+        assert xi.size == 10
+        assert xi_mean.size == 10
+        assert xi_samples.shape == (64, 10)
+        assert xi_cov.shape == (10, 10)
+
+        assert numpy.all(xi < 1) and numpy.all(xi_mean < 1)
+        assert numpy.all(numpy.diag(xi_cov) > 0)
+        assert numpy.isclose(numpy.linalg.det(xi_cov), 0)
         
-        assert len(self.dd_pairs_fixture) == nside**3
-        assert len(self.dd_pairs_fixture[0]) == 10
-        assert self.dd_pairs_fixture[0, 0] == 0
-
-    # def test_tpcf_jk(self, ddpairs):
-
-    #     xi, xi_samples, xi_mean, xi_cov = tpcf.tpcf_jk()
-
-    #     pass
