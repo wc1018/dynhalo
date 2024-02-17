@@ -361,8 +361,8 @@ def density_jk(
     rho_mean = np.mean(rho_samples, axis=0)
 
     # Compute covariance matrix of the radial bins using all jk samples
-    rho_cov = (float(n_jk_samples) - 1.0) * np.cov(rho_samples.T, bias=True) \
-        / np.sqrt(n_obj_d1)
+    rho_cov = (float(n_jk_samples) - 1.0) * \
+        np.cov(rho_samples.T, bias=True) / np.sqrt(n_obj_d1)
 
     rho = density(n_obj=n_obj_d1, radii=radial_data,
                   radial_edges=radial_edges, mass=mass)
