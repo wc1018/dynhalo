@@ -230,7 +230,7 @@ def cross_tpcf_jk(
 
     Parameters
     ----------
-     data_1 : np.ndarray
+    data_1 : np.ndarray
         The array of X/Y/Z positions for the first set of points. Calculations 
         are done in the precision of the supplied arrays.
     data_2 : np.ndarray
@@ -259,7 +259,7 @@ def cross_tpcf_jk(
     -------
     Tuple[np.ndarray]
         Total correlation function and covariance matrix. If `jk_estimates` is
-        True, it also returns the jackknife samples and the their mean.
+        True, it also returns the jackknife samples and their mean.
     """
 
     # Partition box
@@ -311,6 +311,25 @@ def density(
     radial_edges: np.ndarray,
     mass: float,
 ) -> np.ndarray:
+    """Compute density profile as a function of radial separation r.
+
+    Parameters
+    ----------
+    n_obj : int
+        Number of haloes.
+    radii : np.ndarray
+        r coordinate for all particles
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    mass : float
+        Particle mass.
+
+    Returns
+    -------
+    np.ndarray
+        Density profile.
+    """
     n_bins = radial_edges.shape[0] - 1
     volume_shell = 4.0 / 3.0 * np.pi * np.diff((np.power(radial_edges, 3)))
 
@@ -332,7 +351,40 @@ def density_jk(
     boxsize: float,
     gridsize: float,
     mass: float,
-):
+) -> Tuple[np.ndarray]:
+    """_summary_
+
+    Parameters
+    ----------
+    n_obj_d1 : int
+        Number of haloes.
+    data_1_id : list
+        Box partitioning 3D grid.
+    data_1_hid : np.ndarray
+        Halo ID.
+    radial_data : np.ndarray
+        r coordinate for all particles
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    radial_data_1_id : np.ndarray
+        Parent halo ID for each particle.
+    boxsize : float
+        Size of simulation box
+    gridsize : float
+        Size of sub-volume or cell of the box
+    mass : float
+        Particle mass.
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Returns a tuple with `(rho, rho_samples, rho_mean, cov)`, where `rho` is
+        the total correlation function measured directly on the full simulation 
+        box. `rho_samples` is an array of shape `(Njk, Nbins)` with the Njk 
+        samples of the density profile. `rho_mean` and `rho_cov` are the mean 
+        and covariance of `rho_samples`.
+    """
     n_bins = radial_edges.shape[0] - 1
     # Number of cells per dimension
     cells_per_side = int(math.ceil(boxsize / gridsize))
@@ -380,7 +432,38 @@ def cross_tpcf_jk_radial(
     gridsize: float,
     mass: float,
     jk_estimates: bool = True,
-):
+) -> Tuple[np.ndarray]:
+    """_summary_
+
+    Parameters
+    ----------
+    data_1 : np.ndarray
+        The array of X/Y/Z positions for the first set of points. Calculations 
+        are done in the precision of the supplied arrays.
+    data_1_hid : np.ndarray
+        Halo ID.
+    radial_data : np.ndarray
+        r coordinate for all particles
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    radial_data_1_id : np.ndarray
+        Parent halo ID for each particle.
+    boxsize : float
+        Size of simulation box
+    gridsize : float
+        Size of sub-volume or cell of the box
+    mass : float
+        Particle mass.
+    jk_estimates : bool, optional
+        If True returns all the jackknife samples and their mean, by default True
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Total density profile and covariance matrix. If `jk_estimates` is
+        True, it also returns the jackknife samples and their mean.
+    """
     # Partition box
     data_1_id = partition_box(
         data=data_1,
