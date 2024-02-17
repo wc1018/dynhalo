@@ -1,129 +1,17 @@
 import math
-from typing import List, Tuple, Union
+from typing import Tuple
 from warnings import filterwarnings
 
 import numpy as np
 from Corrfunc.theory import DD as countDD
 from tqdm import tqdm
 
+from dhm.corrfunc.bins import partition_box
+
 filterwarnings('ignore')
 
-__all__ = ["generate_bins", "generate_bin_str",
-           "partition_box", "process_DD_pairs"]
-
-
-def generate_bins(
-    bmin: float,
-    bmax: float,
-    nbins: int,
-    logspaced: bool = True,
-    soft: float = 0,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Generates equally spaced bins in linear or logarithmic (base 10) space.
-
-    Parameters
-    ----------
-    bmin : float
-        Minimum or lower bound (inclusive)
-    bmax : float
-        Maximum or upper bound (inclusive)
-    nbins : int
-        Number of bins to generate
-    logspaced : bool, optional
-        Generate log-spaced bins, by default True
-    soft : float, optional
-        If there is softening value, then bmin >= soft, by default 0
-
-    Returns
-    -------
-    Tuple[np.ndarray, np.ndarray]
-        Bins and edges in units of bmin and bmax
-    """
-    if bmin < soft:
-        bmin = soft
-    # Equally log-spaced bins
-    if bmin == 0:
-        logspaced = False
-
-    if logspaced:
-        r_edges = np.logspace(
-            start=np.log10(bmin),
-            stop=np.log10(bmax),
-            num=nbins + 1,
-            base=10,
-        )
-    else:
-        r_edges = np.linspace(
-            start=bmin,
-            stop=bmax,
-            num=nbins + 1,
-        )
-    # Bin middle point
-    rbins = 0.5 * (r_edges[1:] + r_edges[:-1])
-    return rbins, r_edges
-
-
-def generate_bin_str(bin_edges: Union[List[float], Tuple[float]]) -> str:
-    """Generates a formatted string 'min-max' from bin edges. Intended to be 
-    compatible with HDF dataset naming and LaTeX format.
-
-    Parameters
-    ----------
-    bin_edges : Union[List[float], Tuple[float]]
-        A 2-tuple or list with minimum or lower bound and maximum or upper bound
-        of the bin
-
-    Returns
-    -------
-    str
-        _description_
-
-    Raises
-    ------
-    ValueError
-        If bin_edges is not a list or tuple of length 2.
-    """
-    if type(bin_edges) in [list, tuple] and len(bin_edges) == 2:
-        return f'{bin_edges[0]:.2f}-{bin_edges[-1]:.2f}'
-    else:
-        raise ValueError(
-            "bin_edges must be a list of floats and len=2: [min, max]")
-
-
-def partition_box(data: np.ndarray, boxsize: float, gridsize: float) -> List[float]:
-    """Sorts all data points into a 3D grid with `cells per side = boxsize / gridsize`
-
-    Parameters
-    ----------
-    data : np.ndarray
-        `(N, d)` array with all data points' coordinates, where `N` is the 
-        number of data points and `d` the dimensions
-    boxsize : float
-        Simulation box size (per side)
-    gridsize : float
-        Grid size (per side)
-
-    Returns
-    -------
-    List[float]
-
-    """
-    # Number of grid cells per side.
-    cells_per_side = int(math.ceil(boxsize / gridsize))
-    # Grid ID for each data point.
-    grid_id = (data / gridsize).astype(int, copy=False)
-    # Correction for points on the edges.
-    grid_id[np.where(grid_id == cells_per_side)] = cells_per_side - 1
-
-    # This list stores all of the particles original IDs in a convenient 3D
-    # list. It is kind of a pointer of size n_cpd**3
-    data_cell_id = [[] for _ in range(cells_per_side**3)]
-    cells = cells_per_side**2 * grid_id[:, 0] + \
-        cells_per_side * grid_id[:, 1] + grid_id[:, 2]
-    for cell in tqdm(range(np.size(data, 0)), desc="Partitioning box", ncols=100, colour='blue'):
-        data_cell_id[cells[cell]].append(cell)
-
-    return data_cell_id
+__all__ = ["process_DD_pairs",
+           "tpcf_jk", "cross_tpcf"]
 
 
 def process_DD_pairs(
@@ -133,8 +21,8 @@ def process_DD_pairs(
     radial_edges: np.ndarray,
     boxsize: float,
     gridsize: float,
-    weights_1 = None,
-    weights_2 = None,
+    weights_1=None,
+    weights_2=None,
     nthreads: int = 4,
 ) -> np.ndarray:
     """Counts data-data pais by using pre-partitiones box into a 3D grid. 
@@ -290,11 +178,7 @@ def tpcf_jk(
 
     # Volume of the box and spherical shells.
     volume_box = boxsize ** 3
-    volume_shell = np.zeros(n_bins)
-    # Vjk = (N - 1) / N * Vbox
-    for i in range(n_bins):
-        volume_shell[i] = radial_edges[i + 1] ** 3 - radial_edges[i] ** 3
-        volume_shell[i] *= 4.0 * np.pi / 3.0
+    volume_shell = 4.0 / 3.0 * np.pi * np.diff(np.power(radial_edges, 3))
 
     # Number densities
     num_dens_d1 = float(n_obj_d1) / volume_box
@@ -309,12 +193,11 @@ def tpcf_jk(
     dd_pairs_removed_samples = dd_pairs_total[None, :] - dd_pairs
     for sample in range(n_jk_samples):
         # Number of objects in d1 after removing all objects in sample.
-        # d1tot_s1 = n_obj_d1 - np.size(data_1[data_1_id[sample]], 0)
-        d1tot_s1 = n_obj_d1 - np.size(data_1_xx[data_1_id[sample]], 0)
+        d1_total_sample = n_obj_d1 - np.size(data_1_xx[data_1_id[sample]], 0)
 
         # xi_i[cell] = dd_pairs_i[cell] / (n1 * n2 * Vjk * Vshell) - 1
         xi_samples[sample] = dd_pairs_removed_samples[sample] / \
-            (d1tot_s1 * num_dens_d2 * volume_shell) - 1
+            (d1_total_sample * num_dens_d2 * volume_shell) - 1
 
     # Compute mean correlation function from all jk samples
     # for i in range(n_bins):
@@ -347,7 +230,7 @@ def cross_tpcf_jk(
 
     Parameters
     ----------
-     data_1 : np.ndarray
+    data_1 : np.ndarray
         The array of X/Y/Z positions for the first set of points. Calculations 
         are done in the precision of the supplied arrays.
     data_2 : np.ndarray
@@ -376,9 +259,9 @@ def cross_tpcf_jk(
     -------
     Tuple[np.ndarray]
         Total correlation function and covariance matrix. If `jk_estimates` is
-        True, it also returns the jackknife samples and the their mean.
+        True, it also returns the jackknife samples and their mean.
     """
-    
+
     # Partition box
     data_1_id = partition_box(
         data=data_1,
@@ -420,6 +303,189 @@ def cross_tpcf_jk(
     # Covariance
     else:
         return xi, xi_cov
+
+
+def density(
+    n_obj: int,
+    radii: np.ndarray,
+    radial_edges: np.ndarray,
+    mass: float,
+) -> np.ndarray:
+    """Compute density profile as a function of radial separation r.
+
+    Parameters
+    ----------
+    n_obj : int
+        Number of haloes.
+    radii : np.ndarray
+        r coordinate for all particles
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    mass : float
+        Particle mass.
+
+    Returns
+    -------
+    np.ndarray
+        Density profile.
+    """
+    n_bins = radial_edges.shape[0] - 1
+    volume_shell = 4.0 / 3.0 * np.pi * np.diff((np.power(radial_edges, 3)))
+
+    # Compute mass density per spherical shell
+    rho = np.zeros(n_bins)
+    for i in range(n_bins):
+        mask = (radial_edges[i] < radii) & (radii <= radial_edges[i + 1])
+        rho[i] = mass * mask.sum() / (n_obj * volume_shell[i])
+    return rho
+
+
+def density_jk(
+    n_obj_d1: int,
+    data_1_id: list,
+    data_1_hid: np.ndarray,
+    radial_data: np.ndarray,
+    radial_edges: np.ndarray,
+    radial_data_1_id: np.ndarray,
+    boxsize: float,
+    gridsize: float,
+    mass: float,
+) -> Tuple[np.ndarray]:
+    """_summary_
+
+    Parameters
+    ----------
+    n_obj_d1 : int
+        Number of haloes.
+    data_1_id : list
+        Box partitioning 3D grid.
+    data_1_hid : np.ndarray
+        Halo ID.
+    radial_data : np.ndarray
+        r coordinate for all particles
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    radial_data_1_id : np.ndarray
+        Parent halo ID for each particle.
+    boxsize : float
+        Size of simulation box
+    gridsize : float
+        Size of sub-volume or cell of the box
+    mass : float
+        Particle mass.
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Returns a tuple with `(rho, rho_samples, rho_mean, cov)`, where `rho` is
+        the total correlation function measured directly on the full simulation 
+        box. `rho_samples` is an array of shape `(Njk, Nbins)` with the Njk 
+        samples of the density profile. `rho_mean` and `rho_cov` are the mean 
+        and covariance of `rho_samples`.
+    """
+    n_bins = radial_edges.shape[0] - 1
+    # Number of cells per dimension
+    cells_per_side = int(math.ceil(boxsize / gridsize))
+
+    # Number of jackknife samples. One sample per cell
+    n_jk_samples = cells_per_side**3
+
+    # Data 1 index array
+    # n_obj_d1 = np.size(data_1, 0)
+    data_1_xx = np.arange(n_obj_d1)
+
+    rho_samples = np.zeros((n_jk_samples, n_bins))
+    for sample in tqdm(range(n_jk_samples), desc="Pair counting", ncols=100,
+                       colour='green'):
+        d1_total_sample = np.size(data_1_xx[data_1_id[sample]], 0)
+        mask = np.isin(radial_data_1_id, data_1_hid[data_1_id[sample]])
+
+        rho_samples[sample] = density(
+            n_obj=d1_total_sample,
+            radii=radial_data[mask],
+            radial_edges=radial_edges,
+            mass=mass
+        )
+
+    # Compute mean correlation function from all jk samples
+    rho_mean = np.mean(rho_samples, axis=0)
+
+    # Compute covariance matrix of the radial bins using all jk samples
+    rho_cov = (float(n_jk_samples) - 1.0) * \
+        np.cov(rho_samples.T, bias=True) / np.sqrt(n_obj_d1)
+
+    rho = density(n_obj=n_obj_d1, radii=radial_data,
+                  radial_edges=radial_edges, mass=mass)
+
+    return rho, rho_samples, rho_mean, rho_cov
+
+
+def cross_tpcf_jk_radial(
+    data_1: np.ndarray,
+    data_1_hid: np.ndarray,
+    radial_data: np.ndarray,
+    radial_edges: np.ndarray,
+    radial_data_1_id: np.ndarray,
+    boxsize: float,
+    gridsize: float,
+    mass: float,
+    jk_estimates: bool = True,
+) -> Tuple[np.ndarray]:
+    """_summary_
+
+    Parameters
+    ----------
+    data_1 : np.ndarray
+        The array of X/Y/Z positions for the first set of points. Calculations 
+        are done in the precision of the supplied arrays.
+    data_1_hid : np.ndarray
+        Halo ID.
+    radial_data : np.ndarray
+        r coordinate for all particles
+    radial_edges : np.ndarray
+        The bins need to be contiguous and sorted in increasing order (smallest
+        bins come first).
+    radial_data_1_id : np.ndarray
+        Parent halo ID for each particle.
+    boxsize : float
+        Size of simulation box
+    gridsize : float
+        Size of sub-volume or cell of the box
+    mass : float
+        Particle mass.
+    jk_estimates : bool, optional
+        If True returns all the jackknife samples and their mean, by default True
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Total density profile and covariance matrix. If `jk_estimates` is
+        True, it also returns the jackknife samples and their mean.
+    """
+    # Partition box
+    data_1_id = partition_box(
+        data=data_1,
+        box_size=boxsize,
+        grid_size=gridsize,
+    )
+
+    rho, rho_samples, rho_mean, rho_cov = density_jk(
+        n_obj_d1=np.size(data_1, 0),
+        data_1_id=data_1_id,
+        data_1_hid=data_1_hid,
+        radial_data=radial_data,
+        radial_edges=radial_edges,
+        radial_data_1_id=radial_data_1_id,
+        boxsize=boxsize,
+        gridsize=gridsize,
+        mass=mass,
+    )
+    if jk_estimates:
+        return rho, rho_samples, rho_mean, rho_cov
+    else:
+        return rho, rho_cov
 
 
 if __name__ == "__main__":

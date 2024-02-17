@@ -5,7 +5,9 @@ import os
 from dataclasses import dataclass
 from datetime import timedelta
 from time import time
-from typing import Callable
+from typing import Callable, List
+
+import numpy
 
 __all__ = ["timer, mkdir"]
 
@@ -87,6 +89,45 @@ def mkdir(path: str, verbose: bool = False) -> None:
             print(f"Directory could not be created at {abspath}")
             raise
     return None
+
+
+def cartesian_product(arrays: List[numpy.ndarray]):
+    """Generalized N-dimensional products
+    Taken from https://stackoverflow.com/questions/11144513/
+    Answer by Nico Schlömer
+    Updated for numpy > 1.25
+
+    Parameters
+    ----------
+    arrays : List[numpy.ndarray]
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    la = len(arrays)
+    dtype = numpy.result_type(*[a.dtype for a in arrays])
+    arr = numpy.empty([len(a) for a in arrays] + [la], dtype=dtype)
+    for i, a in enumerate(numpy.ix_(*arrays)):
+        arr[..., i] = a
+    return arr.reshape(-1, la)
+
+
+def gen_data_pos_regular(boxsize, gridsize) -> numpy.ndarray:
+    # Populate coordinates with one particle per subbox at the centre in steps
+    # of nside between particles
+    nside = numpy.int_(numpy.ceil(boxsize / gridsize))
+    n_range = numpy.arange(nside, dtype=int)
+    n_pos = numpy.int_(cartesian_product([n_range, n_range, n_range]))
+    data_pos = gridsize * (n_pos + 0.5)
+    return data_pos
+
+
+def gen_data_pos_random(boxsize, nsamples) -> numpy.ndarray:
+    data_pos = boxsize * numpy.random.uniform(0, 1, (nsamples, 3))
+    return data_pos
 
 
 if __name__ == '__main__':
