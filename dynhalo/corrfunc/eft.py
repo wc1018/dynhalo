@@ -200,7 +200,7 @@ def loglike_cs(cs: float, data: Tuple[float]) -> float:
     float
 
     """
-    # Check prior
+    # Check parameter prior
     if cs < 0:
         return -np.inf
 
@@ -228,11 +228,11 @@ def loglike_lamb(lamb: float, data: Tuple[float]) -> float:
     float
 
     """
-    # Check priors
+    # Check parameter prior
     if lamb < 0:
         return -np.inf
+    
     # Unpack data
-
     k, pk, r, xi, cov, cs, boxsize = data
     # Account for the simulation box size in the linear power spectrum
     phat = power_spec_box_effect(k, pk, boxsize, lamb)
@@ -257,10 +257,13 @@ def loglike_B(B: float, data: Tuple[np.ndarray]) -> float:
     float
 
     """
+    # Check parameter prior
     if B < 0:
         return -np.inf
 
+    # Unpack data
     xi, xi_pred = data
+    # Compute chi2
     d = xi - B * xi_pred
     return -np.dot(d, d)
 
