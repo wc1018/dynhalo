@@ -6,7 +6,7 @@ import numpy as np
 from Corrfunc.theory import DD as countDD
 from tqdm import tqdm
 
-from dhm.corrfunc.bins import partition_box
+from dynhalo.corrfunc.bins import partition_box
 
 filterwarnings("ignore")
 

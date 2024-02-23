@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import numpy
 import pytest
 
-from dhm.corrfunc import bins, tpcf
-from dhm.utils import gen_data_pos_random
+from dynhalo.corrfunc import bins, tpcf
+from dynhalo.utils import gen_data_pos_random
 
 
 def radial_bins(rmin=5, rmax=50, n=10):

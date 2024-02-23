@@ -3,7 +3,7 @@ import os
 import numpy
 import pytest
 
-from dhm import utils
+from dynhalo import utils
 
 
 def test_mkdir():

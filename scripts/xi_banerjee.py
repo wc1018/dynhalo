@@ -3,10 +3,10 @@ import os
 import h5py
 import numpy as np
 
-from dhm.corrfunc.bins import generate_bins
-from dhm.corrfunc.eft import xi_large_estimation_from_data
-from dhm.corrfunc.tpcf import cross_tpcf_jk
-from dhm.utils import timer
+from dynhalo.corrfunc.bins import generate_bins
+from dynhalo.corrfunc.eft import xi_large_estimation_from_data
+from dynhalo.corrfunc.tpcf import cross_tpcf_jk
+from dynhalo.utils import timer
 
 
 def matter_auto_corr(pos: np.ndarray, path: str):

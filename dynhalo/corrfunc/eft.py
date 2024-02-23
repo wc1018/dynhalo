@@ -10,7 +10,7 @@ from velocileptors.LPT.cleft_fftw import CLEFT
 from velocileptors.Utils.qfuncfft import loginterp
 from ZeNBu.zenbu import SphericalBesselTransform
 
-from dhm.corrfunc.model import error_func_pos_incr
+from dynhalo.corrfunc.model import error_func_pos_incr
 
 filterwarnings("ignore")
 

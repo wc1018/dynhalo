@@ -3,8 +3,8 @@ import os
 import h5py
 import numpy as np
 
-from dhm.corrfunc.eft import xi_large_estimation_from_data
-from dhm.utils import timer
+from dynhalo.corrfunc.eft import xi_large_estimation_from_data
+from dynhalo.utils import timer
 
 
 def load_quijote_cf(

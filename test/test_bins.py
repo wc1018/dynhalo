@@ -1,8 +1,8 @@
 import numpy
 import pytest
 
-from dhm.corrfunc import bins
-from dhm.utils import gen_data_pos_regular
+from dynhalo.corrfunc import bins
+from dynhalo.utils import gen_data_pos_regular
 
 
 def test_generate_bins():

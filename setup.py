@@ -3,7 +3,7 @@ import glob
 import re
 from setuptools import setup, find_packages
 
-project_name = 'dhm'
+project_name = 'dynhalo'
 sources = glob.glob(os.path.join(project_name,'*.py'))
 
 # auto-updating version code taken from RadVel
@@ -29,7 +29,7 @@ dist = setup(
     version=get_property("__version__", project_name),
     description="Modules for reproducing Salazar et. al. (2024) arXiv:####",
     license="MIT License",
-    # url="https://github.com/edgarmsalazar/Dynamics-Based-Halo-Model",
+    url="https://github.com/edgarmsalazar/Dynamics-Based-Halo-Model",
     packages=find_packages(),
     package_data={project_name: sources},
     install_requires=get_requires(),
