@@ -141,7 +141,7 @@ def inf_smooth_lnlike(
     x, y, covy, mask, morb, xi_large_call, r_h, m_pivot = data
     delta = np.power(10., logd)
     bias = power_law(morb / m_pivot, p=bias_p, s=bias_s)
-    eta = error_func_pos_decr(morb / m_pivot, eta_0, eta_m, eta_s)
+    eta = error_func_pos_decr(np.log10(morb / m_pivot), eta_0, eta_m, eta_s)
     gamma = power_law(morb / m_pivot, p=gamma_p, s=gamma_s)
 
     # Aggregate likelihood for all mass bins
