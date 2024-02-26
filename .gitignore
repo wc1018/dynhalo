@@ -9,3 +9,4 @@ test/img/
 test/data/
 scripts/data/
 scripts/*.ipynb
+scripts/*
