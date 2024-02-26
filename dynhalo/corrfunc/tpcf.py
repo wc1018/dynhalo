@@ -423,7 +423,7 @@ def cross_tpcf_jk_radial(
     data_1_hid: np.ndarray,
     radial_data: np.ndarray,
     radial_edges: np.ndarray,
-    radial_data_1_id: np.ndarray,
+    radial_data_hid: np.ndarray,
     boxsize: float,
     gridsize: float,
     mass: float,
@@ -444,7 +444,7 @@ def cross_tpcf_jk_radial(
     radial_edges : np.ndarray
         The bins need to be contiguous and sorted in increasing order (smallest
         bins come first).
-    radial_data_1_id : np.ndarray
+    radial_data_hid : np.ndarray
         Parent halo ID for each particle.
     boxsize : float
         Size of simulation box
@@ -474,7 +474,7 @@ def cross_tpcf_jk_radial(
         data_1_hid=data_1_hid,
         radial_data=radial_data,
         radial_edges=radial_edges,
-        radial_data_1_id=radial_data_1_id,
+        radial_data_1_id=radial_data_hid,
         boxsize=boxsize,
         gridsize=gridsize,
         mass=mass,
