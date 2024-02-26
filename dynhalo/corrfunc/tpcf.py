@@ -464,8 +464,8 @@ def cross_tpcf_jk_radial(
     # Partition box
     data_1_id = partition_box(
         data=data_1,
-        box_size=boxsize,
-        grid_size=gridsize,
+        boxsize=boxsize,
+        gridsize=gridsize,
     )
 
     rho, rho_samples, rho_mean, rho_cov = density_jk(
