@@ -8,7 +8,7 @@ from dynhalo.corrfunc.model import (error_func_pos_decr, power_law,
 
 def orb_lnlike(
     pars: Union[List[float], Tuple[float, ...]],
-    data: Tuple[np.ndarray]
+    *data: Tuple[np.ndarray]
 ) -> float:
     # Check parameter priors
     r_h, alpha, a, logd = pars
@@ -46,7 +46,7 @@ def orb_lnlike(
 
 def orb_smooth_lnlike(
     pars: Union[List[float], Tuple[float, ...]],
-    data: Tuple[np.ndarray]
+    *data: Tuple[np.ndarray]
 ) -> float:
     # Check parameter priors
     rh_p, rh_s, alpha_p, alpha_s, a, logd = pars
@@ -88,7 +88,7 @@ def orb_smooth_lnlike(
 
 def inf_lnlike(
     pars: Union[List[float], Tuple[float, ...]],
-    data: Tuple[np.ndarray]
+    *data: Tuple[np.ndarray]
 ) -> float:
     # Check parameter priors
     bias, eta, gamma, r_inf, mu, logd = pars
@@ -125,7 +125,7 @@ def inf_lnlike(
 
 def inf_smooth_lnlike(
     pars: Union[List[float], Tuple[float, ...]],
-    data: Tuple[np.ndarray]
+    *data: Tuple[np.ndarray]
 ) -> float:
     # Check parameter priors
     bias_p, bias_s, eta_0, eta_m, eta_s, gamma_p, gamma_s, r_inf, mu, logd = pars
@@ -173,7 +173,7 @@ def inf_smooth_lnlike(
 
 def xihm_lnlike(
     pars: Union[List[float], Tuple[float, ...]],
-    data: Tuple[np.ndarray]
+    *data: Tuple[np.ndarray]
 ) -> float:
     # Check parameter priors
     r_h, alpha, a, bias, eta, gamma, r_inf, mu, logd = pars
@@ -212,7 +212,7 @@ def xihm_lnlike(
 
 def xihm_smooth_lnlike(
     pars: Union[List[float], Tuple[float, ...]],
-    data: Tuple[np.ndarray]
+    *data: Tuple[np.ndarray]
 ) -> float:
 
     # Check parameter priors
