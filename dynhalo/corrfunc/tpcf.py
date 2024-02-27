@@ -385,13 +385,13 @@ def density_jk(
     n_jk_samples = cells_per_side**3
 
     # Data 1 index array
-    data_1_xx = np.arange(n_obj_d1)
+    data_1_row_idx = np.arange(n_obj_d1)
 
     rho_samples = np.zeros((n_jk_samples, n_bins))
     for sample in tqdm(
         range(n_jk_samples), desc="Pair counting", ncols=100, colour="green"
     ):
-        d1_total_sample = np.size(data_1_xx[data_1_id[sample]], 0)
+        d1_total_sample = np.size(data_1_row_idx[data_1_id[sample]], 0)
         mask = np.isin(radial_data_1_id, data_1_hid[data_1_id[sample]])
 
         rho_samples[sample] = density(
