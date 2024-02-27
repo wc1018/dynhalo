@@ -66,6 +66,7 @@ def zeldovich_approx_corr_func_prediction(
     else:
         return cf_lin, cf_zel
 
+
 def eft_tranform(k: np.ndarray) -> SphericalBesselTransform:
     """Creates a spherical Bessel transform object to compute fast Fourier 
     transformations.
@@ -231,7 +232,7 @@ def loglike_lamb(lamb: float, data: Tuple[float]) -> float:
     # Check parameter prior
     if lamb < 0:
         return -np.inf
-    
+
     # Unpack data
     k, pk, r, xi, cov, cs, boxsize = data
     # Account for the simulation box size in the linear power spectrum
