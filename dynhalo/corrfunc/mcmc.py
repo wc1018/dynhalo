@@ -307,14 +307,15 @@ def summary(
             # Create dataset otherwise.
             else:
                 hdf.create_dataset(name_, data=var)
-
-    fig = c.plotter.plot(figsize=(3*n_dim, 3*n_dim))
+    
+    plt.rcParams.update({"text.usetex": True, "font.family": "serif", "figure.dpi": 120})
+    fig = c.plotter.plot(figsize=(3*n_dim, 3*n_dim), truth=max_posterior)
     fig.align_labels()
     plt.savefig(plot_path + f'corner_{plot_name}.png', bbox_inches='tight')
 
-    fig = c.plotter.plot_distributions(col_wrap=3)
+    fig = c.plotter.plot_distributions(col_wrap=3, truth=max_posterior)
     fig.tight_layout()
-    plt.savefig(plot_path + f'posterior_{plot_name}', bbox_inches='tight')
+    plt.savefig(plot_path + f'posterior_{plot_name}.png', bbox_inches='tight')
 
     return None
 
