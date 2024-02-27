@@ -3,8 +3,8 @@ from multiprocessing.pool import Pool
 from typing import Callable, List, Tuple, Union
 
 import h5py
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from chainconsumer import ChainConsumer
 from emcee.autocorr import integrated_time
 from emcee.backends import HDFBackend
@@ -266,7 +266,7 @@ def summary(
     # Setup chainconsumer for computing MLE parameters
     c = ChainConsumer()
     if p_labs:
-        c.add_chain(flat_samples, posterior=log_prob.reshape(-1), 
+        c.add_chain(flat_samples, posterior=log_prob.reshape(-1),
                     parameters=p_labs)
     else:
         c.add_chain(flat_samples, posterior=log_prob.reshape(-1))
@@ -307,7 +307,7 @@ def summary(
             # Create dataset otherwise.
             else:
                 hdf.create_dataset(name_, data=var)
-    
+
     fig = c.plotter.plot(figsize=(3*n_dim, 3*n_dim))
     fig.align_labels()
     plt.savefig(plot_path + f'corner_{plot_name}.png', bbox_inches='tight')
@@ -315,8 +315,6 @@ def summary(
     fig = c.plotter.plot_distributions(col_wrap=3)
     fig.tight_layout()
     plt.savefig(plot_path + f'posterior_{plot_name}', bbox_inches='tight')
-    return None
-
 
     return None
 
