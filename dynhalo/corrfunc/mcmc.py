@@ -9,7 +9,6 @@ from chainconsumer import ChainConsumer
 from emcee.autocorr import integrated_time
 from emcee.backends import HDFBackend
 from emcee.ensemble import EnsembleSampler
-from emcee.moves import DEMove, StretchMove
 
 
 def walker_init(
@@ -164,10 +163,6 @@ def run_burn(
                 pool=pool,
                 backend=backend_burn,
                 args=log_prob_args,
-                moves=[
-                    (DEMove(), 0.5),
-                    (StretchMove(), 0.5),
-                ],
             )
 
             sampler.run_mcmc(
@@ -236,8 +231,6 @@ def run_chain(
     os.remove(path + 'burn.hdf5')
 
     return
-
-# TODO: Has not been tested
 
 
 def summary(
