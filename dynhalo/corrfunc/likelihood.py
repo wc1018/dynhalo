@@ -13,7 +13,7 @@ def orb_lnlike(
     # Check parameter priors
     r_h, alpha, a, logd = pars
     out_of_prior_neg = any([p < 0 for p in (r_h, alpha, a)])
-    out_of_prior_logd = (-4 > logd) & (logd > 0)
+    out_of_prior_logd = (-4 > logd) | (logd > 0)
     if out_of_prior_neg or out_of_prior_logd:
         return -np.inf
 
@@ -52,7 +52,7 @@ def orb_smooth_lnlike(
     rh_p, rh_s, alpha_p, alpha_s, a, logd = pars
     out_of_prior_neg = any([p < 0 for p in (rh_p, rh_s, alpha_p, a)])
     out_of_prior_pos = any([p > 0 for p in (alpha_s, )])
-    out_of_prior_logd = (-4 > logd) & (logd > 0)
+    out_of_prior_logd = (-4 > logd) | (logd > 0)
     if out_of_prior_neg or out_of_prior_pos or out_of_prior_logd:
         return -np.inf
 
@@ -95,7 +95,7 @@ def inf_lnlike(
     out_of_prior_neg = any([p < 0 for p in (eta, gamma, r_inf, mu)])
     out_of_prior_lrg = any([p > 10 for p in (bias, eta, gamma, r_inf, mu)])
     out_of_prior_bias = bias < 1
-    out_of_prior_logd = (-4 > logd) & (logd > 0)
+    out_of_prior_logd = (-4 > logd) | (logd > 0)
     if out_of_prior_neg or out_of_prior_lrg or out_of_prior_bias or out_of_prior_logd:
         return -np.inf
 
@@ -132,8 +132,8 @@ def inf_smooth_lnlike(
     out_of_prior_neg = any(
         [p < 0 for p in (bias_p, bias_s, eta_0, eta_s, gamma_p, gamma_s, r_inf, mu)])
     out_of_prior_lrg = any([p < 0 for p in (eta_0, eta_s)])
-    out_of_prior_eta = (eta_m < -1) & (eta_m > 1)
-    out_of_prior_logd = (-4 > logd) & (logd > 0)
+    out_of_prior_eta = (eta_m < -1) | (eta_m > 1)
+    out_of_prior_logd = (-4 > logd) | (logd > 0)
     if out_of_prior_neg or out_of_prior_lrg or out_of_prior_eta or out_of_prior_logd:
         return -np.inf
 
@@ -181,7 +181,7 @@ def xihm_lnlike(
         [p < 0 for p in (r_h, alpha, a, eta, gamma, r_inf, mu)])
     out_of_prior_lrg = any([p > 10 for p in (bias, eta, gamma, r_inf, mu)])
     out_of_prior_bias = bias < 1
-    out_of_prior_logd = (-4 > logd) & (logd > 0)
+    out_of_prior_logd = (-4 > logd) | (logd > 0)
     if out_of_prior_neg or out_of_prior_lrg or out_of_prior_bias or out_of_prior_logd:
         return -np.inf
 
@@ -221,8 +221,8 @@ def xihm_smooth_lnlike(
         rh_p, rh_s, alpha_p, a, bias_p, bias_s, eta_0, eta_s, gamma_p, gamma_s, r_inf, mu)])
     out_of_prior_pos = any([p > 0 for p in (alpha_s, )])
     out_of_prior_lrg = any([p < 0 for p in (eta_0, eta_s)])
-    out_of_prior_eta = (eta_m < -1) & (eta_m > 1)
-    out_of_prior_logd = (-4 > logd) & (logd > 0)
+    out_of_prior_eta = (eta_m < -1) | (eta_m > 1)
+    out_of_prior_logd = (-4 > logd) | (logd > 0)
     if out_of_prior_neg or out_of_prior_pos or out_of_prior_lrg or out_of_prior_eta or out_of_prior_logd:
         return -np.inf
 
