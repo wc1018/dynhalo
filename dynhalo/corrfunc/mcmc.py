@@ -287,7 +287,7 @@ def summary(
     corr = c.analysis.get_correlations()[-1]
 
     # Save to file.
-    with h5py.File(path + mle_file, "a") as hdf:
+    with h5py.File(path + mle_file, 'a') as hdf:
         for ds, var in zip(
             ['quantiles/', 'max_posterior/', 'covariance/', 'correlations/'],
             [quantiles, max_posterior, cov, corr],
@@ -301,17 +301,17 @@ def summary(
             else:
                 hdf.create_dataset(name_, data=var)
     
-    plt.rcParams.update({"text.usetex": True, "font.family": "serif", "figure.dpi": 120})
-    fig = c.plotter.plot(figsize=(3*n_dim, 3*n_dim), truth=max_posterior)
-    fig.align_labels()
-    plt.savefig(plot_path + f'corner_{plot_name}.png', bbox_inches='tight')
+    # plt.rcParams.update({"text.usetex": True, "font.family": "serif", "figure.dpi": 120})
+    # fig = c.plotter.plot(figsize=(3*n_dim, 3*n_dim), truth=max_posterior)
+    # fig.align_labels()
+    # plt.savefig(plot_path + f'corner_{plot_name}.png', bbox_inches='tight')
 
-    fig = c.plotter.plot_distributions(col_wrap=3, truth=max_posterior)
-    fig.tight_layout()
-    plt.savefig(plot_path + f'posterior_{plot_name}.png', bbox_inches='tight')
+    # fig = c.plotter.plot_distributions(col_wrap=3, truth=max_posterior)
+    # fig.tight_layout()
+    # plt.savefig(plot_path + f'posterior_{plot_name}.png', bbox_inches='tight')
 
     return None
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     pass
