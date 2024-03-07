@@ -120,7 +120,11 @@ def walker_reinit(
         good_walkers[i] = all(dtheta_ia[i, :] / sigma < 3)
     bad_walkers = ~good_walkers
     good_walkers = good_walkers
-
+    
+    # Return the last chain step if there are no 'bad' walkers
+    if bad_walkers.sum() == 0:
+        chain[-1, :, :]
+        
     # Draw n_bad_walker samples from 'good' walkers earlier in time and
     # replace the 'bad' walkers final positons per dimension.
     pos_new = chain[-1, :, :]
