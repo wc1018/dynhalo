@@ -4,9 +4,9 @@ from typing import List, Tuple, Union
 import numpy as np
 from colossus.cosmology import cosmology as ccosmo
 from colossus.lss import peaks as cpeaks
-
-from scipy.interpolate import interp1d
 from scipy.integrate import simpson
+from scipy.interpolate import interp1d
+
 from dynhalo.corrfunc.bins import partition_box
 
 
@@ -62,53 +62,47 @@ def measure_mass_function_jk(
 
 def moving_barrier_model(
     nu_edges: float,
-    delta_c: float,
-    a: float,
+    delta_sc0: float,
     b: float,
     rhom: float,
     mass_from_nu: interp1d,
     boxsize: float,
 ) -> float:
     delta_sc = 1.686
-    c = delta_c / delta_sc
     n_points = len(nu_edges) - 1
-    eval_at_nu = np.zeros(n_points)
-    for i in range(n_points):
-        nu_temp = np.linspace(nu_edges[i], nu_edges[i + 1], 100)
-        nu_tilde = nu_temp * (c + b * np.exp(-nu_temp / a) / delta_sc)
-        integrand = np.sqrt(2./np.pi) * np.exp(-0.5 * nu_tilde**2) * \
-            rhom / mass_from_nu(nu_temp) * boxsize**3 * \
-            (c + b / delta_sc * np.exp(-nu_temp / a) * (1. - nu_temp / a))
-        eval_at_nu[i] = simpson(integrand, nu_temp)
 
+    nu_orb = np.stack([np.linspace(nu_edges[i], nu_edges[i + 1], 100)
+                      for i in range(n_points)])
+    nu0 = nu_orb * delta_sc0 / delta_sc
+    nu_prime = nu0 * (1. + b*np.exp(-nu0) / delta_sc0)
+    integrand = np.sqrt(2. / np.pi) * boxsize**3 * rhom * \
+        np.exp(-0.5*nu_prime**2) / mass_from_nu(nu_orb)
+    eval_at_nu = simpson(integrand, nu_prime)
     return eval_at_nu
 
 
 def moving_barrier_lnlike(pars, *data):
     # Check parameter priors
-    delta_c, a, b, logd = pars
-    out_of_prior_neg = any([p < 0 for p in (delta_c, a, b)])
-    out_of_prior_lrg = any([a > 10, b > 100])
-    out_of_prior_logd = (-4 > logd) | (logd > 0)
-    if out_of_prior_neg or out_of_prior_lrg or out_of_prior_logd:
+    delta_sc0, b = pars
+    out_of_prior_neg = any([p < 0 for p in (delta_sc0, b)])
+    out_of_prior_lrg = any([b > 100])
+    if out_of_prior_neg or out_of_prior_lrg:
         return -np.inf
 
     # Unpack data and evaluate parameters
     x_edges, y, covy, rhom, mass_from_nu, boxsize = data
-    delta = np.power(10., logd)
-
-    y_model = moving_barrier_model(
-        x_edges, delta_c, a, b, rhom, mass_from_nu, boxsize)
-    cov = covy + np.diag((delta*y)**2)
 
     mask = np.diag(covy) != 0
     y = y[mask]
+    covy = covy[mask, :][:, mask]
+
+    y_model = moving_barrier_model(x_edges, delta_sc0, b, rhom, mass_from_nu,
+                                   boxsize)
     y_model = y_model[mask]
-    cov = cov[mask, :][:, mask]
 
     d = y - y_model
-    log_det_cov = np.log(np.linalg.det(cov))
-    chi2 = np.dot(d, np.linalg.solve(cov, d))
+    log_det_cov = np.log(np.linalg.det(covy))
+    chi2 = np.dot(d, np.linalg.solve(covy, d))
 
     return -chi2 - log_det_cov
 
