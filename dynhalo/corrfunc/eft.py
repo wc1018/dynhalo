@@ -210,7 +210,7 @@ def loglike_cs(cs: float, data: Tuple[float]) -> float:
     xi_pred = interp1d(*eft_counter_term_corr_func_prediction(k, pk, cs=cs))
     # Compute chi2
     d = xi - xi_pred(r)
-    return -np.dot(d, np.linalg.solve(cov, d))
+    return -np.dot(d, d / np.diag(cov))
 
 
 def loglike_lamb(lamb: float, data: Tuple[float]) -> float:
@@ -240,7 +240,7 @@ def loglike_lamb(lamb: float, data: Tuple[float]) -> float:
     # Compute chi2
     xi_pred = interp1d(*eft_counter_term_corr_func_prediction(k, phat, cs=cs))
     d = xi - xi_pred(r)
-    return -np.dot(d, np.linalg.solve(cov, d))
+    return -np.dot(d, d / np.diag(cov))
 
 
 def loglike_B(B: float, data: Tuple[np.ndarray]) -> float:
