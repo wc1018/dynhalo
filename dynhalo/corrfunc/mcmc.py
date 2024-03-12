@@ -123,7 +123,7 @@ def walker_reinit(
     
     # Return the last chain step if there are no 'bad' walkers
     if bad_walkers.sum() == 0:
-        chain[-1, :, :]
+        return chain[-1, :, :]
         
     # Draw n_bad_walker samples from 'good' walkers earlier in time and
     # replace the 'bad' walkers final positons per dimension.
