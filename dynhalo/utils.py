@@ -32,6 +32,13 @@ OKGOOD = f"{COLS.OKGREEN}{COLS.BULLET}{COLS.ENDC} "
 FAIL = f"{COLS.FAIL}{COLS.BULLET}{COLS.ENDC} "
 
 
+def get_np_unit_dytpe(obj):
+    np_unit_dtypes = numpy.array([numpy.uint16, numpy.uint32, numpy.uint64])
+    loc = numpy.argmax(
+        [obj < numpy.iinfo(item).max for item in np_unit_dtypes])
+    return np_unit_dtypes[loc]
+
+
 def timer(procedure: Callable) -> Callable:
     """Decorator that prints the procedure's execution time
 
