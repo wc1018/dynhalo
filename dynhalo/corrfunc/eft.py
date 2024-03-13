@@ -9,7 +9,6 @@ from scipy.interpolate import interp1d
 from velocileptors.LPT.cleft_fftw import CLEFT
 from velocileptors.Utils.qfuncfft import loginterp
 from ZeNBu.Utils.spherical_bessel_transform_fftw import SphericalBesselTransform
-# from ZeNBu.zenbu import Zenbu as zenbu
 
 from dynhalo.corrfunc.model import error_func_pos_incr
 
