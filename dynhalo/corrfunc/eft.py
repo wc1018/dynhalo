@@ -8,7 +8,8 @@ from nbodykit.lab import cosmology
 from scipy.interpolate import interp1d
 from velocileptors.LPT.cleft_fftw import CLEFT
 from velocileptors.Utils.qfuncfft import loginterp
-from ZeNBu.zenbu import SphericalBesselTransform
+from ZeNBu.Utils.spherical_bessel_transform_fftw import SphericalBesselTransform
+# from ZeNBu.zenbu import Zenbu as zenbu
 
 from dynhalo.corrfunc.model import error_func_pos_incr
 
@@ -85,8 +86,8 @@ def eft_tranform(k: np.ndarray) -> SphericalBesselTransform:
 
 
 def eft_counter_term_power_spec_prediction(
-    klin: np.ndarray,
-    plin: np.ndarray,
+    k_lin: np.ndarray,
+    p_lin: np.ndarray,
     cs: float = 0,
     k_min: float = 0,
 ) -> Tuple[np.ndarray]:
@@ -95,9 +96,9 @@ def eft_counter_term_power_spec_prediction(
 
     Parameters
     ----------
-    klin : _type_
+    k_lin : np.ndarray
         Fourier modes.
-    plin : _type_
+    p_lin : np.ndarray
         Linear power spectrum evaluated at each k
     cs : float, optional
         Speed sound for the counter term, by default 0
@@ -110,7 +111,7 @@ def eft_counter_term_power_spec_prediction(
     Tuple[np.ndarray]
         Correlation function prediction and r
     """
-    cleft = CLEFT(klin, plin)
+    cleft = CLEFT(k_lin, p_lin)
     cleft.make_ptable(nk=400)
 
     # 1-loop matter power spectrum
@@ -125,17 +126,17 @@ def eft_counter_term_power_spec_prediction(
         k_factor = kcleft**2 / (1 + kcleft**2)
         lptpk += cs * k_factor * cterm
 
-    eft_pred = loginterp(kcleft, lptpk)(klin)
+    eft_pred = loginterp(kcleft, lptpk)(k_lin)
     # The EFT prediction is noisy at low k due to the attenuation, so we force
     # large-scale power to be zero
-    eft_pred[klin < k_min] = 0
+    eft_pred[k_lin < k_min] = 0
 
     return eft_pred
 
 
 def eft_counter_term_corr_func_prediction(
-    klin: np.ndarray,
-    plin: np.ndarray,
+    k_lin: np.ndarray,
+    p_lin: np.ndarray,
     cs: float = 0,
     k_min: float = 0,
 ) -> Tuple[np.ndarray]:
@@ -144,9 +145,9 @@ def eft_counter_term_corr_func_prediction(
 
     Parameters
     ----------
-    klin : _type_
+    k_lin : np.ndarray
         Fourier modes.
-    plin : _type_
+    p_lin : np.ndarray
         Linear power spectrum evaluated at each k
     cs : float, optional
         Speed sound for the counter term, by default 0
@@ -160,9 +161,9 @@ def eft_counter_term_corr_func_prediction(
         Correlation function prediction and r
     """
     # Get power spectrum
-    eftpred = eft_counter_term_power_spec_prediction(klin, plin, cs=cs, k_min=k_min)
+    eftpred = eft_counter_term_power_spec_prediction(k_lin, p_lin, cs=cs, k_min=k_min)
     # Hankel transform object
-    sph = eft_tranform(klin)
+    sph = eft_tranform(k_lin)
     r_eft, xi_eft = sph.sph(0, eftpred)
 
     return r_eft, xi_eft[0]
@@ -367,36 +368,6 @@ def loglike_cs(cs: float, data: Tuple[float]) -> float:
     return -np.dot(d, d / np.diag(cov))
 
 
-# def loglike_lamb(lamb: float, data: Tuple[float]) -> float:
-#     """Log-likelihood for the attenuation parameter in the power spectrum low k 
-#     limit
-
-#     Parameters
-#     ----------
-#     lamb : float
-#         Attenuation factor
-#     data : Tuple[float]
-#         (k, pk, r, xi, cov, cs, boxsize)
-
-#     Returns
-#     -------
-#     float
-
-#     """
-#     # Check parameter prior
-#     if lamb < 0:
-#         return -np.inf
-
-#     # Unpack data
-#     k, pk, r, xi, cov, cs, boxsize = data
-#     # Account for the simulation box size in the linear power spectrum
-#     phat = power_spec_box_effect(k, pk, boxsize, lamb)
-#     # Compute chi2
-#     xi_pred = interp1d(*eft_counter_term_corr_func_prediction(k, phat, cs=cs))
-#     d = xi - xi_pred(r)
-#     return -np.dot(d, d / np.diag(cov))
-
-
 def loglike_B(B: float, data: Tuple[np.ndarray]) -> float:
     """Log-likelihood for the ratio parameter between ZA and data.
 
@@ -423,7 +394,39 @@ def loglike_B(B: float, data: Tuple[np.ndarray]) -> float:
     return -np.dot(d, d)
 
 
-def find_cs(k_lin, p_lin, r, xi, xi_cov, r_min = 40, r_max = 80) -> float:
+def find_cs(
+    k_lin: np.ndarray, 
+    p_lin: np.ndarray, 
+    r: np.ndarray, 
+    xi: np.ndarray, 
+    xi_cov: np.ndarray, 
+    r_min: float = 40, 
+    r_max: float = 80
+) -> float:
+    """Finds the optimal cs value for the given power spectrum
+
+    Parameters
+    ----------
+    k_lin : np.ndarray
+        Fourier modes.
+    p_lin : np.ndarray
+        Linear power spectrum evaluated at each k
+    r : np.ndarray
+        Radial points where the correlation function was measured
+    xi : np.ndarray
+        Measured correlation function
+    xi_cov : np.ndarray
+        Covariance matrix of the measured correlation function
+    r_min : float, optional
+        Lower bound for the fit, by default 40
+    r_max : float, optional
+        Upper bound for the fit, by default 80
+
+    Returns
+    -------
+    float
+        Speed sound for the counter term
+    """
     r_mask = (r_min < r) & (r_max < 80)
     args = (k_lin, p_lin, r[r_mask], xi[r_mask], xi_cov[r_mask, :][:, r_mask])
     # Define grids to estimate cs
@@ -441,26 +444,24 @@ def find_cs(k_lin, p_lin, r, xi, xi_cov, r_min = 40, r_max = 80) -> float:
     return cs_max
 
 
-# def find_lamb(k_lin, p_lin, r, xi, xi_cov, cs_max, boxsize) -> float:
-#     r_mask = (40 < r) & (r < 150)
-#     args = (k_lin, p_lin, r[r_mask], xi[r_mask], xi_cov[r_mask, :][:, r_mask],
-#             cs_max, boxsize)
-#     # Define grids to estimate cs
-#     ngrid = 16
-#     grid = np.logspace(-1.5, 1, ngrid)
-#     with Pool(16) as p:
-#         loglike_grid = p.starmap(loglike_lamb, zip(grid, repeat(args, ngrid)))
-#     lamb_max = grid[np.argmax(loglike_grid)]
-#     # Refine grid around cs_max with 10% deviation below and 50% above
-#     ngrid = 80
-#     grid = np.linspace(0.9*lamb_max, 1.5*lamb_max, ngrid)
-#     with Pool(16) as p:
-#         loglike_grid = p.starmap(loglike_lamb, zip(grid, repeat(args, ngrid)))
-#     lamb_max = grid[np.argmax(loglike_grid)]
-#     return lamb_max
+def find_B(
+    xi_data: np.ndarray,
+    xi_zel: np.ndarray
+) -> float:
+    """Find the optimal value for the offset B
 
+    Parameters
+    ----------
+    xi_data : np.ndarray
+        Measured correlation function
+    xi_zel : np.ndarray
+        Zel'dovich approximaiton prediction
 
-def find_B(xi_data, xi_zel) -> float:
+    Returns
+    -------
+    float
+        Offset parameter
+    """
     B_grid = np.linspace(0.8, 1.2, 10_000)
     loglike_grid = [loglike_B(b, (xi_data, xi_zel))
                     for b in B_grid]
@@ -476,6 +477,33 @@ def xi_large_construct(
     fmu: float = 40.,
     fsig: float = 3.,
 ) -> np.ndarray:
+    """Constructs the function \xi_large for given LTP and Zel'dovich 
+    Approximation models, as a smooth transition between both terms.
+
+    xi_large = (1-f)\xi_zel + f\xi_LTP
+
+    where f is an error function.
+
+    Parameters
+    ----------
+    r : np.ndarray
+        Radial points of the measured correlation function
+    xi_zel : np.ndarray
+        Zel'dovich approximation prediction at each r
+    xi_eft : np.ndarray
+        LTP prediction at each r
+    b : float
+        Offset parameter
+    fmu : float, optional
+        Error function mean/offset parameter, by default 40.
+    fsig : float, optional
+        Error function width parameter, by default 3.
+
+    Returns
+    -------
+    np.ndarray
+        Correlation function for all scales
+    """
     erf_transition = error_func_pos_incr(r, 1.0, fmu, fsig)
     xi_large = (1.0 - erf_transition) * b * xi_zel + \
         erf_transition * xi_eft
