@@ -9,3 +9,4 @@ chainconsumer
 velocileptors @ git+https://github.com/sfschen/velocileptors.git
 ZeNBu @ git+https://github.com/sfschen/ZeNBu.git
 # pylians @ git+https://github.com/franciscovillaescusa/Pylians
+colossus
