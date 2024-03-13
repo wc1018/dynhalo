@@ -87,7 +87,8 @@ def eft_tranform(k: np.ndarray) -> SphericalBesselTransform:
 def eft_counter_term_power_spec_prediction(
     klin: np.ndarray,
     plin: np.ndarray,
-    cs: float = 0
+    cs: float = 0,
+    k_min: float = 0,
 ) -> Tuple[np.ndarray]:
     """Computes the 1-Loop LPT power spectrum prediction from linear power
       spectrum up to the counter term.
@@ -98,8 +99,11 @@ def eft_counter_term_power_spec_prediction(
         Fourier modes.
     plin : _type_
         Linear power spectrum evaluated at each k
-    cs : int, optional
+    cs : float, optional
         Speed sound for the counter term, by default 0
+    k_min : float
+        Smallest k-mode with power. All scales below `k_min` are set to have 
+        zero power, by default 0
 
     Returns
     -------
@@ -122,13 +126,18 @@ def eft_counter_term_power_spec_prediction(
         lptpk += cs * k_factor * cterm
 
     eft_pred = loginterp(kcleft, lptpk)(klin)
+    # The EFT prediction is noisy at low k due to the attenuation, so we force
+    # large-scale power to be zero
+    eft_pred[klin < k_min] = 0
+
     return eft_pred
 
 
 def eft_counter_term_corr_func_prediction(
     klin: np.ndarray,
     plin: np.ndarray,
-    cs: float = 0
+    cs: float = 0,
+    k_min: float = 0,
 ) -> Tuple[np.ndarray]:
     """Computes the 1-Loop LPT correlation function prediction from linear power
       spectrum up to the counter term.
@@ -139,8 +148,11 @@ def eft_counter_term_corr_func_prediction(
         Fourier modes.
     plin : _type_
         Linear power spectrum evaluated at each k
-    cs : int, optional
+    cs : float, optional
         Speed sound for the counter term, by default 0
+    k_min : float
+        Smallest k-mode with power. All scales below `k_min` are set to have 
+        zero power, by default 0
 
     Returns
     -------
@@ -148,7 +160,7 @@ def eft_counter_term_corr_func_prediction(
         Correlation function prediction and r
     """
     # Get power spectrum
-    eftpred = eft_counter_term_power_spec_prediction(klin, plin, cs=cs)
+    eftpred = eft_counter_term_power_spec_prediction(klin, plin, cs=cs, k_min=k_min)
     # Hankel transform object
     sph = eft_tranform(klin)
     r_eft, xi_eft = sph.sph(0, eftpred)
@@ -172,7 +184,7 @@ def power_spec_box_effect(
     pk : np.ndarray
         Power spectrum evaluated at each k
     boxsize : float
-        Simulation box size.
+        Simulation box size
     lamb : float
         Attenuation factor at small k
 
@@ -184,6 +196,148 @@ def power_spec_box_effect(
     rbox = boxsize * np.cbrt(3. / 4. / np.pi)
     phat = (1 - np.exp(-lamb * (rbox * k) ** 2)) * pk
     return phat
+
+
+def heaviside_step(
+    lamb: float,
+    theta: float,
+    phi: float, 
+    boxsize: float,
+) -> bool:
+    """Computes the Heaviside step function in spherical coordinates
+
+    Parameters
+    ----------
+    lamb : float
+        Wave length in unites of `boxsize`
+    theta : float
+        Azimuthal angle
+    phi : float
+        Axial angle
+    boxsize : float
+        Simulation box size
+
+    Returns
+    -------
+    bool
+        True if the wave length fits inside the box. False otherwise
+    """
+    y1 = np.abs(lamb * np.sin(theta) * np.cos(phi)) < boxsize
+    y2 = np.abs(lamb * np.sin(theta) * np.sin(phi)) < boxsize
+    y3 = np.abs(lamb * np.cos(theta)) < boxsize
+    return y1 & y2 & y3
+
+
+def k_modes_fraction_monte_carlo(
+    lamb: float,
+    theta: np.ndarray,
+    phi: np.ndarray, 
+    boxsize: float,
+) -> float:
+    """Returns the Monte-Carlo integral of the fraction of wave lengths that fit 
+    inside the box across all possible angles
+
+    The integral evaluated is 
+
+    \begin{align*}
+    f(\lambda) &=  \frac{1}{4\pi} \int d\Omega\, \Theta(\lambda, \theta, \phi) \\
+    & = \int d\Omega\, \Theta(\lambda, \theta, \phi) P(\theta, \phi)
+    \end{align*}
+
+    where $P(\theta, \phi)=\frac{1}{4\pi}$ is a uniform distribution over the sphere.
+
+    The Monte Carlo integral for this problem looks as follows:
+
+    \begin{equation*}
+    f(\lambda) =  \frac{1}{N} \sum_{\theta, \phi} \Theta(\lambda, \theta, \phi)
+    \end{equation*}
+
+    where the angles are uniformly distributed over the sphere. That is:
+    \begin{align*}
+    \cos\theta &= U(0, 1) \\
+    \phi & = U(0, 2\pi)
+    \end{align*}
+
+    Parameters
+    ----------
+    lamb : float
+        Wave length in unites of `boxsize`
+    theta : float
+        Randomly sampled azimuthal angles
+    phi : float
+        Randomly samlped axial angles
+    boxsize : float
+        Simulation box size
+
+    Returns
+    -------
+    float
+        Fraction of wave lengths with length `lamb` that fit inside the box.
+    """
+    return np.mean(heaviside_step(lamb, theta, phi, boxsize))
+
+
+def power_spec_box_effect_k_modes(
+    k: np.ndarray,
+    pk: np.ndarray,
+    boxsize: float,
+    n_draws: int = 1_000_000,
+    n_modes: int = 500
+) -> np.ndarray:
+    """Returns the power spectrum `pk` such that large scales are attenuated by 
+    the fraction of Fourier k modes that fit inside the box. This is done 
+    through integrating over all angles for each k within the size of the box 
+    and the main diagonal of the box.
+
+    Parameters
+    ----------
+    k : np.ndarray
+        Fourier modes
+    pk : np.ndarray
+        Power spectrum evaluated at each k
+    boxsize : float
+        Simulation box size
+    n_draws : int, optional
+        Number of random draws for each angle, by default 1_000_000
+    n_modes : int, optional
+        Number of subdivisions between the mode corresponding to the size of the
+        box and the main diagonal mode, by default 500
+
+    Returns
+    -------
+    np.ndarray
+        Attenuated power spectrum
+    """
+    # Maximum wave mode that fits in the main diagonal of the box
+    lamb_max = np.sqrt(3.) * boxsize
+
+    # Draw random samples frtom
+    thetas = np.arccos(np.random.uniform(size=n_draws))
+    phis = np.random.uniform(high=2.*np.pi, size=n_draws)
+
+    # Create a linear grid of wave modes
+    lambda_modes = np.linspace(0.95*boxsize, 1.05*lamb_max, n_modes)
+    # The corresponding Fourier modes
+    k_modes = 2.*np.pi / lambda_modes
+
+    # Compute the Monte-Carlo integral for the fraction of modes that fit in the
+    # box given the wave length
+    # args = (thetas, phis, boxsize)
+    with Pool(16) as pool:
+        frac = pool.starmap(k_modes_fraction_monte_carlo,
+                            zip(
+                                lambda_modes,
+                                repeat(thetas, n_modes),
+                                repeat(phis, n_modes),
+                                repeat(boxsize, n_modes)
+                            ))
+    frac = np.array(frac)
+
+    # Interpolate the fraction as a function of Fourier modes and evaluate the
+    # fraction in the given k modes
+    frac_phat = interp1d(k_modes, frac, fill_value='extrapolate')(k)
+
+    return frac_phat * pk
 
 
 def loglike_cs(cs: float, data: Tuple[float]) -> float:
@@ -213,34 +367,34 @@ def loglike_cs(cs: float, data: Tuple[float]) -> float:
     return -np.dot(d, d / np.diag(cov))
 
 
-def loglike_lamb(lamb: float, data: Tuple[float]) -> float:
-    """Log-likelihood for the attenuation parameter in the power spectrum low k 
-    limit
+# def loglike_lamb(lamb: float, data: Tuple[float]) -> float:
+#     """Log-likelihood for the attenuation parameter in the power spectrum low k 
+#     limit
 
-    Parameters
-    ----------
-    lamb : float
-        Attenuation factor
-    data : Tuple[float]
-        (k, pk, r, xi, cov, cs, boxsize)
+#     Parameters
+#     ----------
+#     lamb : float
+#         Attenuation factor
+#     data : Tuple[float]
+#         (k, pk, r, xi, cov, cs, boxsize)
 
-    Returns
-    -------
-    float
+#     Returns
+#     -------
+#     float
 
-    """
-    # Check parameter prior
-    if lamb < 0:
-        return -np.inf
+#     """
+#     # Check parameter prior
+#     if lamb < 0:
+#         return -np.inf
 
-    # Unpack data
-    k, pk, r, xi, cov, cs, boxsize = data
-    # Account for the simulation box size in the linear power spectrum
-    phat = power_spec_box_effect(k, pk, boxsize, lamb)
-    # Compute chi2
-    xi_pred = interp1d(*eft_counter_term_corr_func_prediction(k, phat, cs=cs))
-    d = xi - xi_pred(r)
-    return -np.dot(d, d / np.diag(cov))
+#     # Unpack data
+#     k, pk, r, xi, cov, cs, boxsize = data
+#     # Account for the simulation box size in the linear power spectrum
+#     phat = power_spec_box_effect(k, pk, boxsize, lamb)
+#     # Compute chi2
+#     xi_pred = interp1d(*eft_counter_term_corr_func_prediction(k, phat, cs=cs))
+#     d = xi - xi_pred(r)
+#     return -np.dot(d, d / np.diag(cov))
 
 
 def loglike_B(B: float, data: Tuple[np.ndarray]) -> float:
@@ -269,8 +423,8 @@ def loglike_B(B: float, data: Tuple[np.ndarray]) -> float:
     return -np.dot(d, d)
 
 
-def find_cs(k_lin, p_lin, r, xi, xi_cov) -> float:
-    r_mask = (40 < r) & (r < 80)
+def find_cs(k_lin, p_lin, r, xi, xi_cov, r_min = 40, r_max = 80) -> float:
+    r_mask = (r_min < r) & (r_max < 80)
     args = (k_lin, p_lin, r[r_mask], xi[r_mask], xi_cov[r_mask, :][:, r_mask])
     # Define grids to estimate cs
     ngrid = 16
@@ -287,23 +441,23 @@ def find_cs(k_lin, p_lin, r, xi, xi_cov) -> float:
     return cs_max
 
 
-def find_lamb(k_lin, p_lin, r, xi, xi_cov, cs_max, boxsize) -> float:
-    r_mask = (40 < r) & (r < 150)
-    args = (k_lin, p_lin, r[r_mask], xi[r_mask], xi_cov[r_mask, :][:, r_mask],
-            cs_max, boxsize)
-    # Define grids to estimate cs
-    ngrid = 16
-    grid = np.logspace(-1.5, 1, ngrid)
-    with Pool(16) as p:
-        loglike_grid = p.starmap(loglike_lamb, zip(grid, repeat(args, ngrid)))
-    lamb_max = grid[np.argmax(loglike_grid)]
-    # Refine grid around cs_max with 10% deviation below and 50% above
-    ngrid = 80
-    grid = np.linspace(0.9*lamb_max, 1.5*lamb_max, ngrid)
-    with Pool(16) as p:
-        loglike_grid = p.starmap(loglike_lamb, zip(grid, repeat(args, ngrid)))
-    lamb_max = grid[np.argmax(loglike_grid)]
-    return lamb_max
+# def find_lamb(k_lin, p_lin, r, xi, xi_cov, cs_max, boxsize) -> float:
+#     r_mask = (40 < r) & (r < 150)
+#     args = (k_lin, p_lin, r[r_mask], xi[r_mask], xi_cov[r_mask, :][:, r_mask],
+#             cs_max, boxsize)
+#     # Define grids to estimate cs
+#     ngrid = 16
+#     grid = np.logspace(-1.5, 1, ngrid)
+#     with Pool(16) as p:
+#         loglike_grid = p.starmap(loglike_lamb, zip(grid, repeat(args, ngrid)))
+#     lamb_max = grid[np.argmax(loglike_grid)]
+#     # Refine grid around cs_max with 10% deviation below and 50% above
+#     ngrid = 80
+#     grid = np.linspace(0.9*lamb_max, 1.5*lamb_max, ngrid)
+#     with Pool(16) as p:
+#         loglike_grid = p.starmap(loglike_lamb, zip(grid, repeat(args, ngrid)))
+#     lamb_max = grid[np.argmax(loglike_grid)]
+#     return lamb_max
 
 
 def find_B(xi_data, xi_zel) -> float:
@@ -390,13 +544,13 @@ def xi_large_estimation_from_data(
     cs_max = find_cs(k_lin, p_lin, r, xi, xi_cov)
 
     # Account for the box size effects on large scale Fourier modes
-    lamb_max = find_lamb(k_lin, p_lin, r, xi, xi_cov, cs_max, boxsize)
+    p_hat = power_spec_box_effect_k_modes(k_lin, p_lin, boxsize)
 
     # Compute the 1-loop EFT approx.
-    p_hat = power_spec_box_effect(k_lin, p_lin, boxsize, lamb_max)
-    p_eft = eft_counter_term_power_spec_prediction(k_lin, p_hat, cs=cs_max)
+    k_min = 2 * np.pi / np.sqrt(3) / boxsize
+    p_eft = eft_counter_term_power_spec_prediction(k_lin, p_hat, cs=cs_max, k_min=k_min)
     r_eft, xi_eft = eft_counter_term_corr_func_prediction(
-        k_lin, p_hat, cs=cs_max)
+        k_lin, p_hat, cs=cs_max, k_min=k_min)
 
     # Evaluate ZA in the same grid as EFT
     p_zel = pk_zel_call(k_lin)
@@ -412,7 +566,8 @@ def xi_large_estimation_from_data(
 
     power_spectra = (k_lin, p_lin, p_hat, p_eft, p_zel)
     corr_func = (r_eft, xi_lin, xi_eft, xi_zel,
-                 xi_large, B_max, cs_max, lamb_max)
+                 #  xi_large, B_max, cs_max, lamb_max)
+                 xi_large, B_max, cs_max)
     # Return all quantities
     if large_only:
         return r_eft, xi_large
