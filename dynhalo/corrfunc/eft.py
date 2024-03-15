@@ -399,7 +399,7 @@ def find_cs(
     r: np.ndarray, 
     xi: np.ndarray, 
     xi_cov: np.ndarray, 
-    r_min: float = 40, 
+    r_min: float = 25, 
     r_max: float = 80
 ) -> float:
     """Finds the optimal cs value for the given power spectrum
