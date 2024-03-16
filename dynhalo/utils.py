@@ -11,6 +11,8 @@ import numpy
 
 __all__ = ["timer, mkdir"]
 
+# Gravitational constant
+G_gravity = 4.3e-09
 
 @dataclass(frozen=True)
 class COLS:
