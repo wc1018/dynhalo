@@ -92,8 +92,8 @@ def get_sub_box_id(
 
 
 def get_adjacent_sub_box_ids(
-    id: np.ndarray,
-    ids: np.ndarray,
+    sub_box_id: np.ndarray,
+    sub_box_ids: np.ndarray,
     positions: np.ndarray,
     boxsize: float,
     subsize: float,
@@ -103,9 +103,9 @@ def get_adjacent_sub_box_ids(
 
     Parameters
     ----------
-    id : np.ndarray
+    sub_box_id : np.ndarray
         ID of the sub-box
-    ids : np.ndarray
+    sub_box_ids : np.ndarray
         IDs of all sub-boxes
     positions : np.ndarray
         Positions of all the centres of the sub-boxes
@@ -124,14 +124,14 @@ def get_adjacent_sub_box_ids(
     ValueError
         If `id` is not found in the allowed values in `ids`
     """
-    if id not in ids:
-        raise ValueError(f'ID {id} is out of bounds')
+    if sub_box_id not in sub_box_ids:
+        raise ValueError(f'ID {sub_box_id} is out of bounds')
 
-    x0 = positions[ids == id]
+    x0 = positions[sub_box_ids == sub_box_id]
     d = relative_coordinates(x0, positions, boxsize)
     d = np.sqrt(np.sum(np.square(d), axis=1))
     mask = d <= 1.01*np.sqrt(3)*subsize
-    return ids[mask]
+    return sub_box_ids[mask]
 
 
 @timer
@@ -214,7 +214,7 @@ def split_simulation_into_sub_boxes(
     velocities : np.ndarray
         _description_
     ids : np.ndarray
-        _description_
+        Unique IDs for each position (e.g. PID, HID)
     boxsize : float
         Size of simulation box
     subsize : float
@@ -340,7 +340,7 @@ def split_simulation_into_sub_boxes(
 
 
 def _load_sub_box(
-    id: int,
+    sub_box_id: int,
     path: str,
     name: str = None,
 ) -> Tuple[np.ndarray]:
@@ -348,7 +348,7 @@ def _load_sub_box(
 
     Parameters
     ----------
-    id : int
+    sub_box_id : int
         Sub-box ID
     path : str
         Location from where to load the file
@@ -364,7 +364,7 @@ def _load_sub_box(
         prefix = f'{name}/'
     else:
         prefix = None
-    with h5.File(path + f'sub_boxes/{id}.hdf5', 'r') as hdf:
+    with h5.File(path + f'sub_boxes/{sub_box_id}.hdf5', 'r') as hdf:
         pos = hdf[prefix + 'pos'][()]
         vel = hdf[prefix + 'vel'][()]
         pid = hdf[prefix + 'ID'][()]
@@ -374,7 +374,7 @@ def _load_sub_box(
 
 
 def load_particles(
-    id: int,
+    sub_box_id: int,
     boxsize: float,
     subsize: float,
     path: str,
@@ -384,7 +384,7 @@ def load_particles(
 
     Parameters
     ----------
-    id : int
+    sub_box_id : int
         Sub-box ID
     path : str
         Location from where to load the file
@@ -405,8 +405,8 @@ def load_particles(
     grid_ids, grid_pos = generate_sub_box_grid(boxsize, subsize)
     # Get the adjacent sub-box IDs
     adj_sub_box_ids = get_adjacent_sub_box_ids(
-        id=id,
-        ids=grid_ids,
+        sub_box_id=sub_box_id,
+        sub_box_ids=grid_ids,
         positions=grid_pos,
         boxsize=boxsize,
         subsize=subsize
@@ -427,7 +427,7 @@ def load_particles(
 
     # Mask particles within a padding distance of the edge of the box in each
     # direction
-    loc_id = grid_ids == id
+    loc_id = grid_ids == sub_box_id
     padded_distance = 0.5 * subsize + padding
     rel_abs_position = np.abs(relative_coordinates(
         grid_pos[loc_id], pos, boxsize, periodic=True))
@@ -441,14 +441,14 @@ def load_particles(
 
 
 def load_seeds(
-    id: int,
+    sub_box_id: int,
     path: str,
 ) -> Tuple[np.ndarray]:
     """Load seeds from a sub-box
 
     Parameters
     ----------
-    id : int
+    sub_box_id : int
         Sub-box ID
     path : str
         Location from where to load the file
@@ -458,7 +458,7 @@ def load_seeds(
     Tuple[np.ndarray]
         Position, velocity, ID and row index
     """
-    return _load_sub_box(id=id, path=path, name='seed')
+    return _load_sub_box(id=sub_box_id, path=path, name='seed')
 
 
 if __name__ == '__main__':
