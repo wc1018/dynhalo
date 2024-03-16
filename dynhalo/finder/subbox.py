@@ -6,36 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 from dynhalo.utils import cartesian_product, get_np_unit_dytpe, timer
-
-
-def relative_coordinates(
-    x0: np.ndarray,
-    x: np.ndarray,
-    boxsize: float,
-    periodic: bool = True
-) -> float:
-    """Returns the coordinates x relative to x0 accounting for periodic boundary
-    conditions
-
-    Parameters
-    ----------
-    x0 : np.ndarray
-        Reference position in cartesian coordinates
-    x : np.ndarray
-        Position array (N, 3)
-    boxsize : float
-        Size of simulation box
-    periodic : bool, optional
-        Set to True if the simulation box is periodic, by default True
-
-    Returns
-    -------
-    float
-        Relative positions
-    """
-    if periodic:
-        return (x - x0 + 0.5*boxsize) % boxsize - 0.5*boxsize
-    return x - x0
+from dynhalo.finder.halo import relative_coordinates
 
 
 def generate_sub_box_grid(
@@ -311,16 +282,16 @@ def split_simulation_into_sub_boxes(
         sb_unique = np.unique(sb_ids)
         order = np.argsort(sb_ids)
         # Save all items at each unique sub-box ID
-        for item in sb_unique:
-            left = np.searchsorted(sb_ids, item, side="left", sorter=order)
-            right = np.searchsorted(sb_ids, item, side="right", sorter=order)
+        for sub_box in sb_unique:
+            left = np.searchsorted(sb_ids, sub_box, side="left", sorter=order)
+            right = np.searchsorted(sb_ids, sub_box, side="right", sorter=order)
 
             pos_item = pos[order][left:right]
             vel_item = vel[order][left:right]
             pid_item = pid[order][left:right]
             row_item = row[order][left:right]
 
-            with h5.File(save_path + f"{item}.hdf5", "a") as hdf:
+            with h5.File(save_path + f"{sub_box}.hdf5", "a") as hdf:
                 if not name in hdf.keys():
                     hdf.create_group(name)
 
@@ -446,8 +417,9 @@ def load_particles(
                           for _ in range(4))
 
     # Load all adjacent boxes
-    for i, item in enumerate(adj_sub_box_ids):
-        pos[i], vel[i], pid[i], row[i] = _load_sub_box(item, path, name='part')
+    for i, sub_box in enumerate(adj_sub_box_ids):
+        pos[i], vel[i], pid[i], row[i] = _load_sub_box(sub_box, path, name='part')
+    # Concatenate into a single array
     pos = np.concatenate(pos)
     vel = np.concatenate(vel)
     pid = np.concatenate(pid)
