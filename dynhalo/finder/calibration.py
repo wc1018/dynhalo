@@ -93,12 +93,12 @@ def _select_particles_around_haloes(
     r, vr, lnv2 = ([] for _ in range(3))
     # Iterate over sub-box IDs
     # NOTE: Could parallelise this but it is not super slow
-    for sub_box in tqdm(unique_sub_box_ids, desc='Processing sub-box',
+    for sub_box_id in tqdm(unique_sub_box_ids, desc='Processing sub-box',
                         colour='blue', ncols=100):
-        pos, vel, _, _ = load_particles(sub_box, boxsize, subsize, path)
+        pos, vel, _, _ = load_particles(sub_box_id, boxsize, subsize, path)
 
         # Iterate over seeds in current sub-box ID
-        mask_seeds_in_sub_box = seed_sub_box_id == sub_box
+        mask_seeds_in_sub_box = seed_sub_box_id == sub_box_id
         for i in range(mask_seeds_in_sub_box.sum()):
             # Compute the relative positions of all particles in the box
             rel_pos = relative_coordinates(pos_seed[mask_seeds_in_sub_box][i], pos,
