@@ -485,11 +485,11 @@ def load_seeds(
             subsize=subsize
         )
         # Create empty lists (containers) to save the data from file for each ID
-        pos, vel, pid, row = ([[] for _ in range(len(adj_sub_box_ids))]
+        pos, vel, pid, row = ([[] for _ in range(len(adj_sub_box_ids)-1)]
                               for _ in range(4))
 
         # Load all adjacent boxes
-        for i, sub_box in enumerate(adj_sub_box_ids):
+        for i, sub_box in enumerate(adj_sub_box_ids[adj_sub_box_ids!=sub_box_id]):
             if sub_box == sub_box_id:
                 continue
             else:
