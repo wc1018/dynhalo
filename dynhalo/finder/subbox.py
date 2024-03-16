@@ -442,7 +442,11 @@ def load_particles(
 
 def load_seeds(
     sub_box_id: int,
+    boxsize: float,
+    subsize: float,
     path: str,
+    padding: float = 5.0,
+    adjacent: bool = False,
 ) -> Tuple[np.ndarray]:
     """Load seeds from a sub-box
 
@@ -450,6 +454,10 @@ def load_seeds(
     ----------
     sub_box_id : int
         Sub-box ID
+    boxsize : float
+        Size of simulation box
+    subsize : float
+        Size of sub-box
     path : str
         Location from where to load the file
 
@@ -458,7 +466,46 @@ def load_seeds(
     Tuple[np.ndarray]
         Position, velocity, ID and row index
     """
-    return _load_sub_box(id=sub_box_id, path=path, name='seed')
+    if adjacent:
+        # Generate the IDs and positions of the sub-box grid
+        grid_ids, grid_pos = generate_sub_box_grid(boxsize, subsize)
+        # Get the adjacent sub-box IDs
+        adj_sub_box_ids = get_adjacent_sub_box_ids(
+            sub_box_id=sub_box_id,
+            sub_box_ids=grid_ids,
+            positions=grid_pos,
+            boxsize=boxsize,
+            subsize=subsize
+        )
+        # Create empty lists (containers) to save the data from file for each ID
+        pos, vel, pid, row = ([[] for _ in range(len(adj_sub_box_ids))]
+                            for _ in range(4))
+
+        # Load all adjacent boxes
+        for i, sub_box in enumerate(adj_sub_box_ids):
+            pos[i], vel[i], pid[i], row[i] = _load_sub_box(sub_box, path, name='part')
+        # Concatenate into a single array
+        pos = np.concatenate(pos)
+        vel = np.concatenate(vel)
+        pid = np.concatenate(pid)
+        row = np.concatenate(row)
+    
+        # Mask particles within a padding distance of the edge of the box in each
+        # direction
+        loc_id = grid_ids == sub_box_id
+        padded_distance = 0.5 * subsize + padding
+        rel_abs_position = np.abs(relative_coordinates(
+            grid_pos[loc_id], pos, boxsize, periodic=True))
+        # Probably a better way to create this mask
+        mask_x = (rel_abs_position[:, 0] < padded_distance)
+        mask_y = (rel_abs_position[:, 1] < padded_distance)
+        mask_z = (rel_abs_position[:, 2] < padded_distance)
+        mask = mask_x & mask_y & mask_z
+
+        return pos[mask], vel[mask], pid[mask], row[mask]
+
+    else:
+        return _load_sub_box(sub_box_id, path=path, name='seed')
 
 
 if __name__ == '__main__':
