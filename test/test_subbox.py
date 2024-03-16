@@ -20,8 +20,8 @@ x_sv = l_sv * (n_pos + 0.5)
 
 def test_adjacent_svid():
     adj_ids = get_adjacent_sub_box_ids(
-        id=0,
-        ids=id_sv,
+        sub_box_id=0,
+        sub_box_ids=id_sv,
         positions=x_sv,
         boxsize=l_box,
         subsize=l_sv,
