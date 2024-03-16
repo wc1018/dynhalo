@@ -1,7 +1,9 @@
+import os
 from typing import Tuple
 
 import h5py as h5
 import numpy as np
+from scipy.optimize import curve_fit, minimize
 from tqdm import tqdm
 
 from dynhalo.finder.coordinates import (get_vr_vt_from_coordinates,
@@ -196,7 +198,110 @@ def get_calibration_data(
             hdf.create_dataset('lnv2', data=lnv2)
 
         return r, vr, lnv2
-    
+
+
+def cost_percentile(b: float, *data) -> float:
+    x, y, m, target = data
+    below_line = (y < (m * x + b)).sum()
+    return np.log((target - below_line / x.shape[0]) ** 2)
+
+
+def cost_perp_distance(b: float, *data) -> float:
+    x, y, m, w = data
+    d = np.abs(y - m * x - b) / np.sqrt(1 + m**2)
+    return -np.log(np.mean(d[(d < w)] ** 2))
+
+
+def gradient_minima(
+    r: np.ndarray,
+    lnv2: np.ndarray,
+    mask_vr_pos: np.ndarray,
+    n_points: int,
+    r_min: float,
+    r_max: float,
+) -> Tuple[np.ndarray]:
+    r_edges_grad = np.linspace(r_min, r_max, n_points + 1)
+    grad_r = 0.5 * (r_edges_grad[:-1] + r_edges_grad[1:])
+    grad_min = np.zeros(n_points)
+    for i in range(n_points):
+        r_mask = (r > r_edges_grad[i]) * (r < r_edges_grad[i + 1])
+        hist_yv, hist_edges = np.histogram(lnv2[mask_vr_pos * r_mask], bins=200)
+        hist_lnv2 = 0.5 * (hist_edges[:-1] + hist_edges[1:])
+        hist_lnv2_grad = np.gradient(hist_yv, np.mean(np.diff(hist_edges)))
+        lnv2_mask = (1.0 < hist_lnv2) * (hist_lnv2 < 2.0)
+        grad_min[i] = hist_lnv2[lnv2_mask][np.argmin(hist_lnv2_grad[lnv2_mask])]
+
+    return grad_r, grad_min
+
+@timer
+def calibrate_finder(
+    n_seeds: int,
+    r_max: float,
+    boxsize: float,
+    subsize: float,
+    file_seeds: str,
+    path: str,
+    part_mass: float,
+    rhom: float,
+    n_points: int = 20,
+    perc: float = 0.98,
+    width: float = 0.05,
+):
+    r, vr, lnv2 = get_calibration_data(
+        n_seeds=n_seeds,
+        r_max=r_max,
+        boxsize=boxsize,
+        subsize=subsize,
+        file_seeds=file_seeds,
+        path=path,
+        part_mass=part_mass,
+        rhom=rhom
+    )
+
+    mask_vr_neg = (vr < 0)
+    mask_vr_pos = ~mask_vr_neg
+    mask_r = r < 2.0
+
+    # For vr > 0 ===============================================================
+    r_grad, min_grad = gradient_minima(r, lnv2, mask_vr_pos, n_points, 0.2, 0.5)
+    # Find slope by fitting to the minima.
+    popt, _ = curve_fit(lambda x, m, b: m * x + b, r_grad, min_grad, p0=[-1, 2])
+    m_pos, b01 = popt
+
+    # Find intercept by finding the value that contains 96% of particles below
+    # the line.
+    res = minimize(
+        cost_percentile,
+        1.1 * b01,
+        bounds=((0.8 * b01, 3.0),),
+        args=(r[mask_vr_pos * mask_r], lnv2[mask_vr_pos * mask_r], m_pos, perc),
+        method='Nelder-Mead',
+    )
+    b_pos = res.x[0]
+
+    # For vr < 0 ===============================================================
+    r_grad, min_grad = gradient_minima(r, lnv2, mask_vr_neg, n_points, 0.2, 0.5)
+    # Find slope by fitting to the minima.
+    popt, _ = curve_fit(lambda x, m, b: m * x + b, r_grad, min_grad, p0=[-1, 2])
+    m_neg, b02 = popt
+
+    # Find intercept by finding the value that maximizes the perpendicular
+    # distance between points to the line.
+    res = minimize(
+        cost_perp_distance,
+        0.75 * b02,
+        bounds=((1.2, b02),),
+        args=(r[mask_vr_neg], lnv2[mask_vr_neg], m_neg, width),
+        method='Nelder-Mead',
+    )
+    b_neg = res.x[0]
+
+    with h5.File(path + 'calibration_pars.hdf5', 'w') as hdf:
+        hdf.create_dataset('pos', data=[m_pos, b_pos])
+        hdf.create_dataset('neg', data=[m_neg, b_neg])
+
+    return
+
 
 if __name__ == "__main__":
     pass
