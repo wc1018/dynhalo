@@ -1,11 +1,11 @@
 import os
-
 from typing import Tuple
+
 import h5py as h5
 import numpy as np
 from tqdm import tqdm
 
-from dynhalo.utils import timer, cartesian_product, get_np_unit_dytpe
+from dynhalo.utils import cartesian_product, get_np_unit_dytpe, timer
 
 
 def relative_coordinates(
@@ -128,7 +128,7 @@ def get_adjacent_sub_box_ids(
     subsize: float,
 ) -> np.ndarray:
     """Returns a list of all IDs that are adjacent to the specified sub-box ID.
-    There are always 27 adjacent boxes in a 3D volume.
+    There are always 27 adjacent boxes in a 3D volume, including the specified ID.
 
     Parameters
     ----------
@@ -234,6 +234,39 @@ def split_simulation_into_sub_boxes(
     path: str,
     name: str = None,
 ) -> None:
+    """Sorts all items into sub-boxes and saves them in disc.
+
+    Parameters
+    ----------
+    positions : np.ndarray
+        _description_
+    velocities : np.ndarray
+        _description_
+    ids : np.ndarray
+        _description_
+    boxsize : float
+        Size of simulation box
+    subsize : float
+        Size of sub-box
+    chunksize : float
+        Number of items to process at a time in chunks
+    dtypes : list
+        Data types for positions and velocities
+    path : str
+        Where to save the IDs
+    name : str, optional
+        An additional name or identifier appended at the end of the file name, 
+        by default None
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the chunksize is larger than the number of items
+    """
     # Check chunksize is smaller than the number of items
     n_items = positions.shape[0]
     if chunksize > n_items:
@@ -246,15 +279,16 @@ def split_simulation_into_sub_boxes(
         os.makedirs(save_path)
 
     if not os.path.exists(save_path):
-        generate_sub_box_ids(positions, boxsize, subsize, chunksize, path, name)
-    
+        generate_sub_box_ids(positions, boxsize, subsize,
+                             chunksize, path, name)
+
     if name:
         sub_box_ids_file = path + f'sub_box_id_{name}.hdf5'
     else:
         sub_box_ids_file = path + f'sub_box_id.hdf5'
     with h5.File(sub_box_ids_file, 'r') as hdf:
         sub_box_ids = hdf['SBID'][()]
-    
+
     n_iter = n_items // chunksize
 
     uint_dtype_row = get_np_unit_dytpe(n_items)
@@ -276,6 +310,7 @@ def split_simulation_into_sub_boxes(
 
         sb_unique = np.unique(sb_ids)
         order = np.argsort(sb_ids)
+        # Save all items at each unique sub-box ID
         for item in sb_unique:
             left = np.searchsorted(sb_ids, item, side="left", sorter=order)
             right = np.searchsorted(sb_ids, item, side="right", sorter=order)
@@ -288,7 +323,7 @@ def split_simulation_into_sub_boxes(
             with h5.File(save_path + f"{item}.hdf5", "a") as hdf:
                 if not name in hdf.keys():
                     hdf.create_group(name)
-                
+
                 # If it is the first time opening this file, create datasets
                 if not 'ID' in hdf[name].keys():
                     hdf.create_dataset(
@@ -315,7 +350,7 @@ def split_simulation_into_sub_boxes(
                         maxshape=(None, ),
                         dtype=uint_dtype_row,
                     )
-                # If it is not the first time opening the file, reshape the 
+                # If it is not the first time opening the file, reshape the
                 # datasets
                 else:
                     last_item = pid_item.shape[0]
@@ -331,6 +366,129 @@ def split_simulation_into_sub_boxes(
                     hdf[f'{name}/row_idx'][-last_item:] = row_item
 
     return None
+
+
+def _load_sub_box(
+    id: int,
+    path: str,
+    name: str = None,
+) -> Tuple[np.ndarray]:
+    """Load sub-box
+
+    Parameters
+    ----------
+    id : int
+        Sub-box ID
+    path : str
+        Location from where to load the file
+    name : str, optional
+        Identifier within the file, by default None
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Position, velocity, ID and row index
+    """
+    if name:
+        prefix = f'{name}/'
+    else:
+        prefix = None
+    with h5.File(path + f'sub_boxes/{id}.hdf5', 'r') as hdf:
+        pos = hdf[prefix + 'pos'][()]
+        vel = hdf[prefix + 'vel'][()]
+        pid = hdf[prefix + 'ID'][()]
+        row = hdf[prefix + 'row_idx'][()]
+
+    return pos, vel, pid, row
+
+
+def load_particles(
+    id: int,
+    boxsize: float,
+    subsize: float,
+    path: str,
+    padding: float = 5.0,
+) -> Tuple[np.ndarray]:
+    """Load particles from a sub-box
+
+    Parameters
+    ----------
+    id : int
+        Sub-box ID
+    path : str
+        Location from where to load the file
+    boxsize : float
+        Size of simulation box
+    subsize : float
+        Size of sub-box
+    padding : float
+        Only particles up to this distance from the sub-box edge are considered 
+        for classification. Defaults to 5
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Position, velocity, ID and row index
+    """
+    # Generate the IDs and positions of the sub-box grid
+    grid_ids, grid_pos = generate_sub_box_grid(boxsize, subsize)
+    # Get the adjacent sub-box IDs
+    adj_sub_box_ids = get_adjacent_sub_box_ids(
+        id=id,
+        ids=grid_ids,
+        positions=grid_pos,
+        boxsize=boxsize,
+        subsize=subsize
+    )
+
+    # Create empty lists (containers) to save the data from file for each ID
+    pos, vel, pid, row = ([[] for _ in range(len(adj_sub_box_ids))]
+                          for _ in range(4))
+
+    # Load all adjacent boxes
+    for i, item in enumerate(adj_sub_box_ids):
+        with h5.File('r') as hdf:
+            pos[i], vel[i], pid[i], row[i] = _load_sub_box(
+                item, path, name='part')
+        pos = np.concatenate(pos)
+        vel = np.concatenate(vel)
+        pid = np.concatenate(pid)
+        row = np.concatenate(row)
+
+    # Mask particles within a padding distance of the edge of the box in each
+    # direction
+    loc_id = grid_ids == id
+    padded_distance = 0.5 * subsize + padding
+    rel_abs_position = np.abs(relative_coordinates(
+        grid_pos[loc_id], pos, boxsize, periodic=True))
+    # Probably a better way to create this mask
+    mask_x = (rel_abs_position[:, 0] < padded_distance)
+    mask_y = (rel_abs_position[:, 1] < padded_distance)
+    mask_z = (rel_abs_position[:, 2] < padded_distance)
+    mask = mask_x & mask_y & mask_z
+
+    return pos[mask], vel[mask], pid[mask], row[mask]
+
+
+def load_seeds(
+    id: int,
+    path: str,
+) -> Tuple[np.ndarray]:
+    """Load seeds from a sub-box
+
+    Parameters
+    ----------
+    id : int
+        Sub-box ID
+    path : str
+        Location from where to load the file
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Position, velocity, ID and row index
+    """
+    return _load_sub_box(id=id, path=path, name='seed')
 
 
 if __name__ == '__main__':
