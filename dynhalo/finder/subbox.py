@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 from dynhalo.utils import cartesian_product, get_np_unit_dytpe, timer
-from dynhalo.finder.halo import relative_coordinates
+from dynhalo.finder.coordinates import relative_coordinates
 
 
 def generate_sub_box_grid(
