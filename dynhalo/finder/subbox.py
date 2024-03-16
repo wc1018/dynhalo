@@ -462,6 +462,11 @@ def load_seeds(
         Size of sub-box
     path : str
         Location from where to load the file
+    padding : float
+        Only particles up to this distance from the sub-box edge are considered 
+        for classification. Defaults to 5
+    adjacent : bool
+        If True, returns only de adjacent seeds, by default False
 
     Returns
     -------
@@ -485,8 +490,11 @@ def load_seeds(
 
         # Load all adjacent boxes
         for i, sub_box in enumerate(adj_sub_box_ids):
-            pos[i], vel[i], pid[i], row[i] = _load_sub_box(
-                sub_box, path, name='part')
+            if sub_box == sub_box_id:
+                continue
+            else:
+                pos[i], vel[i], pid[i], row[i] = _load_sub_box(
+                    sub_box, path, name='part')
         # Concatenate into a single array
         pos = np.concatenate(pos)
         vel = np.concatenate(vel)
