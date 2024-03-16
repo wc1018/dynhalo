@@ -447,13 +447,11 @@ def load_particles(
 
     # Load all adjacent boxes
     for i, item in enumerate(adj_sub_box_ids):
-        with h5.File('r') as hdf:
-            pos[i], vel[i], pid[i], row[i] = _load_sub_box(
-                item, path, name='part')
-        pos = np.concatenate(pos)
-        vel = np.concatenate(vel)
-        pid = np.concatenate(pid)
-        row = np.concatenate(row)
+        pos[i], vel[i], pid[i], row[i] = _load_sub_box(item, path, name='part')
+    pos = np.concatenate(pos)
+    vel = np.concatenate(vel)
+    pid = np.concatenate(pid)
+    row = np.concatenate(row)
 
     # Mask particles within a padding distance of the edge of the box in each
     # direction
