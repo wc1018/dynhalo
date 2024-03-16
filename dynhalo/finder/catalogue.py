@@ -1,10 +1,13 @@
 import os
+from functools import partial
+from multiprocessing import Pool
 from typing import List, Tuple, Union
 from warnings import filterwarnings
 
 import h5py as h5
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from dynhalo.finder.coordinates import relative_coordinates
 from dynhalo.finder.subbox import load_particles, load_seeds
@@ -132,10 +135,7 @@ def classify_seeds_in_sub_box(
     -------
     None
     """
-    # Create directory if it does not exist
     save_path = path + 'sub_box_catalogues/'
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
 
     # Load seeds
     pos_seed, vel_seed, hid_seed, row_seed = load_seeds(sub_box_id, boxsize,
@@ -250,6 +250,36 @@ def classify_seeds_in_sub_box(
                                    data=halo_subs[item]['row_idx'])
                 hdf.create_dataset(f'members/halo/{str(item)}/dph',
                                    data=halo_subs[item]['dph'])
+
+    return None
+
+
+@timer
+def generate_full_box_catalogue(
+    path: str,
+    nthreads: int,
+    min_num_part: int,
+    part_mass: float,
+    rhom: float,
+    boxsize: float,
+    subsize: float,
+    padding: float = 5.0,
+) -> None:
+    # Create directory if it does not exist
+    save_path = path + 'sub_box_catalogues/'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    n_sub_boxes = np.int_(np.ceil(boxsize / subsize))**3
+
+    func = partial(classify_seeds_in_sub_box, min_num_part=min_num_part,
+                   part_mass=part_mass, rhom=rhom, boxsize=boxsize,
+                   subsize=subsize, path=path, padding=padding)
+
+    with Pool(nthreads) as pool:
+        list(tqdm(pool.imap(func, range(n_sub_boxes)),
+                  total=n_sub_boxes, colour="green", ncols=100,
+                  desc='Generating halo catalogue'))
 
     return None
 
