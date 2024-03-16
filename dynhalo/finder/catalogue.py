@@ -1,12 +1,16 @@
-from typing import Tuple, List, Union
+import os
+from typing import List, Tuple, Union
+from warnings import filterwarnings
 
 import h5py as h5
 import numpy as np
 import pandas as pd
 
-from dynhalo.utils import G_gravity
-from dynhalo.finder.subbox import load_particles, load_seeds
 from dynhalo.finder.coordinates import relative_coordinates
+from dynhalo.finder.subbox import load_particles, load_seeds
+from dynhalo.utils import G_gravity, timer
+
+filterwarnings('ignore')
 
 
 def find_r200_m200(
@@ -128,6 +132,11 @@ def classify_seeds_in_sub_box(
     -------
     None
     """
+    # Create directory if it does not exist
+    save_path = path + 'sub_box_catalogues/'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
     # Load seeds
     pos_seed, vel_seed, hid_seed, row_seed = load_seeds(sub_box_id, boxsize,
                                                         subsize, path, padding)
@@ -139,7 +148,7 @@ def classify_seeds_in_sub_box(
     hid_seed_adj = np.hstack([hid_seed, hid_seed_adj])
     row_seed_adj = np.hstack([row_seed, row_seed_adj])
     pos_seed_adj = np.vstack([pos_seed, pos_seed_adj])
-    vel_seed_adj = np.hstack([vel_seed, vel_seed_adj])
+    vel_seed_adj = np.vstack([vel_seed, vel_seed_adj])
 
     # Load particles
     pos_part, vel_part, pid_part, row_part = load_particles(sub_box_id, boxsize,
@@ -149,9 +158,7 @@ def classify_seeds_in_sub_box(
     # Create empty catalog of found halos and a dictionary with the PIDs
     halo_members = {}
     halo_subs = {}
-    col_names = ("OHID", "pos", "vel", "R200m", "M200m", "Morb")
-    dtypes = (np.uint32, np.float32, np.float32,
-              np.float32, np.float32, np.float32)
+    col_names = ("OHID", "pos", "vel", "R200m", "M200m_all", "Morb")
     haloes = pd.DataFrame(columns=col_names)
 
     # Load calibration parameters
@@ -162,7 +169,7 @@ def classify_seeds_in_sub_box(
 
     for i in range(n_seeds):
         # Classify particles ===================================================
-        rel_pos = relative_coordinates(pos_seed[i], pos_part)
+        rel_pos = relative_coordinates(pos_seed[i], pos_part, boxsize)
         rel_vel = vel_part - vel_seed[i]
         r200, m200 = find_r200_m200(rel_pos, part_mass, rhom)
         v200sq = G_gravity * m200 / r200
@@ -178,12 +185,13 @@ def classify_seeds_in_sub_box(
             continue
 
         # Select orbiting particles' PID
-        orb_pid = pid_part[mask_orb]
-        orb_arg = row_part[mask_orb]
-        orb_dph = dphsq[mask_orb]
+        row_idx_order = np.argsort(row_part[mask_orb])
+        orb_pid = pid_part[mask_orb][row_idx_order]
+        orb_arg = row_part[mask_orb][row_idx_order]
+        orb_dph = dphsq[mask_orb][row_idx_order]
 
         # Classify seeds =======================================================
-        rel_pos = relative_coordinates(pos_seed[i], pos_seed_adj)
+        rel_pos = relative_coordinates(pos_seed[i], pos_seed_adj, boxsize)
         rel_vel = vel_seed_adj - vel_seed[i]
         # Classify
         mask_orb_seed = classify(rel_pos, rel_vel, r200, m200, pars)
@@ -191,9 +199,10 @@ def classify_seeds_in_sub_box(
         dphsq = np.sum(np.square(rel_pos), axis=1) / r200**2 + \
             np.sum(np.square(rel_vel), axis=1) / v200sq
         # Select orbiting particles' PID
-        orb_pid_seed = hid_seed_adj[mask_orb_seed]
-        orb_arg_seed = row_seed_adj[mask_orb_seed]
-        orb_dph_seed = dphsq[mask_orb_seed]
+        row_idx_order = np.argsort(row_seed_adj[mask_orb_seed])
+        orb_pid_seed = hid_seed_adj[mask_orb_seed][row_idx_order]
+        orb_arg_seed = row_seed_adj[mask_orb_seed][row_idx_order]
+        orb_dph_seed = dphsq[mask_orb_seed][row_idx_order]
 
         # Append halo to halo catalogue if there are at least min_dm_part
         # orbiting particles
@@ -205,25 +214,42 @@ def classify_seeds_in_sub_box(
             m200,
             part_mass * mask_orb.sum(),
         ]
-        halo_members[hid_seed[i]] = np.array([orb_pid, orb_arg, orb_dph]).T
+        halo_members[hid_seed[i]] = {'PID': orb_pid,
+                                     'row_idx': orb_arg,
+                                     'dph': orb_dph}
 
         if mask_orb_seed.sum() > 0:
-            halo_subs[hid_seed[i]] = np.array(
-                [orb_pid_seed, orb_arg_seed, orb_dph_seed]).T
+            halo_subs[hid_seed[i]] = {'OHID': orb_pid_seed,
+                                      'row_idx': orb_arg_seed,
+                                      'dph': orb_dph_seed}
 
     # Save catalogue
-    with h5.File(path + '', 'w') as hdf:
+    with h5.File(save_path + f'{sub_box_id}.hdf5', 'w') as hdf:
         # Save halo catalogue
         for i, key in enumerate(haloes.columns):
-            data = haloes[key].values
-            hdf.create_dataset(f'halo/{key}', data=data, dtype=dtypes[i])
+            if key in ["pos", "vel"]:
+                data = np.stack(haloes[key].values)
+            else:
+                data = haloes[key].values
+            hdf.create_dataset(f'halo/{key}', data=data)
         # Save halo members (particles)
         # Dataset names must be strings (thus are not properly sorted)
-        for item, data in halo_members.items():
-            hdf.create_dataset(f'members/part/{str(item)}', data=data)
+        for item in halo_members.keys():
+            hdf.create_dataset(f'members/part/{str(item)}/PID',
+                               data=halo_members[item]['PID'])
+            hdf.create_dataset(f'members/part/{str(item)}/row_idx',
+                               data=halo_members[item]['row_idx'])
+            hdf.create_dataset(f'members/part/{str(item)}/dph',
+                               data=halo_members[item]['dph'])
         # Save halo members (seed)
-        for item, data in halo_subs.items():
-            hdf.create_dataset(f'members/halo/{str(item)}', data=data)
+        if mask_orb_seed.sum() > 0:
+            for item in halo_subs.keys():
+                hdf.create_dataset(f'members/halo/{str(item)}/OHID',
+                                   data=halo_subs[item]['OHID'])
+                hdf.create_dataset(f'members/halo/{str(item)}/row_idx',
+                                   data=halo_subs[item]['row_idx'])
+                hdf.create_dataset(f'members/halo/{str(item)}/dph',
+                                   data=halo_subs[item]['dph'])
 
     return None
 
