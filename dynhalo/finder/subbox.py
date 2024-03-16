@@ -284,7 +284,8 @@ def split_simulation_into_sub_boxes(
         # Save all items at each unique sub-box ID
         for sub_box in sb_unique:
             left = np.searchsorted(sb_ids, sub_box, side="left", sorter=order)
-            right = np.searchsorted(sb_ids, sub_box, side="right", sorter=order)
+            right = np.searchsorted(
+                sb_ids, sub_box, side="right", sorter=order)
 
             pos_item = pos[order][left:right]
             vel_item = vel[order][left:right]
@@ -418,7 +419,8 @@ def load_particles(
 
     # Load all adjacent boxes
     for i, sub_box in enumerate(adj_sub_box_ids):
-        pos[i], vel[i], pid[i], row[i] = _load_sub_box(sub_box, path, name='part')
+        pos[i], vel[i], pid[i], row[i] = _load_sub_box(
+            sub_box, path, name='part')
     # Concatenate into a single array
     pos = np.concatenate(pos)
     vel = np.concatenate(vel)
@@ -479,17 +481,18 @@ def load_seeds(
         )
         # Create empty lists (containers) to save the data from file for each ID
         pos, vel, pid, row = ([[] for _ in range(len(adj_sub_box_ids))]
-                            for _ in range(4))
+                              for _ in range(4))
 
         # Load all adjacent boxes
         for i, sub_box in enumerate(adj_sub_box_ids):
-            pos[i], vel[i], pid[i], row[i] = _load_sub_box(sub_box, path, name='part')
+            pos[i], vel[i], pid[i], row[i] = _load_sub_box(
+                sub_box, path, name='part')
         # Concatenate into a single array
         pos = np.concatenate(pos)
         vel = np.concatenate(vel)
         pid = np.concatenate(pid)
         row = np.concatenate(row)
-    
+
         # Mask particles within a padding distance of the edge of the box in each
         # direction
         loc_id = grid_ids == sub_box_id
