@@ -44,7 +44,7 @@ def _select_particles_around_haloes(
     part_mass : float
         Mass per particle
     rhom : float
-        Mass density
+        Mass density of the universe
 
     Returns
     -------
@@ -166,7 +166,7 @@ def get_calibration_data(
     part_mass : float
         Mass per particle
     rhom : float
-        Mass density
+        Mass density of the universe
 
     Returns
     -------
@@ -201,31 +201,85 @@ def get_calibration_data(
 
 
 def cost_percentile(b: float, *data) -> float:
-    x, y, m, target = data
-    below_line = (y < (m * x + b)).sum()
-    return np.log((target - below_line / x.shape[0]) ** 2)
+    """Cost function for y-intercept b parameter. The optimal value of b is such
+    that the `target` percentile of paricles is below the line.
+
+    Parameters
+    ----------
+    b : float
+        Fit parameter
+    *data : tuple
+        A tuple with `[r, lnv2, slope, target]`, where `slope` is the slope of 
+        the line and is fixed, and `target` is the desired percentile
+
+    Returns
+    -------
+    float
+    """
+    r, lnv2, slope, target = data
+    below_line = (lnv2 < (slope * r + b)).sum()
+    return np.log((target - below_line / r.shape[0]) ** 2)
 
 
 def cost_perp_distance(b: float, *data) -> float:
-    x, y, m, w = data
-    d = np.abs(y - m * x - b) / np.sqrt(1 + m**2)
-    return -np.log(np.mean(d[(d < w)] ** 2))
+    """Cost function for y-intercept b parameter. The optimal value of b is such
+    that the perpendicular distance of all points to the line is maximal
+    Parameters
+    ----------
+    b : float
+        Fit parameter
+    *data: tuple
+        A tuple with `[r, lnv2, slope, width]`, where `slope` is the slope of 
+        the line and is fixed, and `width` is the width of a band around the 
+        line within which the distance is computed
+        
+    Returns
+    -------
+    float
+        _description_
+    """
+    r, lnv2, slope, width = data
+    d = np.abs(lnv2 - slope * r - b) / np.sqrt(1 + slope**2)
+    return -np.log(np.mean(d[(d < width)] ** 2))
 
 
 def gradient_minima(
     r: np.ndarray,
     lnv2: np.ndarray,
-    mask_vr_pos: np.ndarray,
+    mask_vr: np.ndarray,
     n_points: int,
     r_min: float,
     r_max: float,
 ) -> Tuple[np.ndarray]:
+    """Computes the r-lnv2 gradient and finds the minimum as a function of `r`
+    within the interval `[r_min, r_max]`
+
+    Parameters
+    ----------
+    r : np.ndarray
+        Radial separation
+    lnv2 : np.ndarray
+        Log-kinetic energy
+    mask_vr : np.ndarray
+        Mask for the selection of radial velocity
+    n_points : int
+        Number of minima points to compute
+    r_min : float
+        Minimum radial distance
+    r_max : float
+        Maximum radial distance
+
+    Returns
+    -------
+    Tuple[np.ndarray]
+        Radial and minima coordinates.
+    """
     r_edges_grad = np.linspace(r_min, r_max, n_points + 1)
     grad_r = 0.5 * (r_edges_grad[:-1] + r_edges_grad[1:])
     grad_min = np.zeros(n_points)
     for i in range(n_points):
         r_mask = (r > r_edges_grad[i]) * (r < r_edges_grad[i + 1])
-        hist_yv, hist_edges = np.histogram(lnv2[mask_vr_pos * r_mask], bins=200)
+        hist_yv, hist_edges = np.histogram(lnv2[mask_vr * r_mask], bins=200)
         hist_lnv2 = 0.5 * (hist_edges[:-1] + hist_edges[1:])
         hist_lnv2_grad = np.gradient(hist_yv, np.mean(np.diff(hist_edges)))
         lnv2_mask = (1.0 < hist_lnv2) * (hist_lnv2 < 2.0)
@@ -247,6 +301,35 @@ def calibrate_finder(
     perc: float = 0.98,
     width: float = 0.05,
 ):
+    """_summary_
+
+    Parameters
+    ----------
+    n_seeds : int
+        Number of seeds to process
+    r_max : float
+        Maximum distance to consider
+    boxsize : float
+        Size of simulation box
+    subsize : float
+        Size of sub-box
+    file_seeds : str
+        File containing the seeds, including path.
+    path : str
+        Path to the sub-boxes
+    part_mass : float
+        Mass per particle
+    rhom : float
+        Mass density of the universe
+    n_points : int, optional
+        Number of minima points to compute, by default 20
+    perc : float, optional
+        Target percentile for the positive radial velocity calibration, 
+        by default 0.98
+    width : float, optional
+        Band width for the negattive radial velocity calibration, 
+        by default 0.05
+    """
     r, vr, lnv2 = get_calibration_data(
         n_seeds=n_seeds,
         r_max=r_max,
