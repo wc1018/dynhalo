@@ -455,7 +455,7 @@ def percolate_members(
                 continue
             hdf_save.create_dataset(item, data=hdf[item])
         hdf_save.create_dataset('Morb', data=morb_new)
-        hdf_save.create_dataset('Rh_salazar', data=rh)
+        hdf_save.create_dataset('Rh_salazar', data=rh, dtype=np.float32)
 
     return
 
