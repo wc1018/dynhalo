@@ -363,14 +363,11 @@ def generate_full_box_catalogue(
 
 
 @timer
-def percolate_members(
-    path: str,
-    part_mass: float,
-) -> None:
+def percolate_members(path: str, part_mass: float) -> None:
     """Percolates the halo catalogue. If any particle has membership to more 
-    than one halo, it is kept in he closest halo and removed from the others.
+    than one halo, it is kept in the closest halo and removed from the others.
     The measure of distance is phase-space distance:
-    
+
             d^{2}_{p,h} = |x-x_h|^2 / R200^2 + |v-v_h|^2 / V200^2
 
     Parameters
@@ -457,7 +454,87 @@ def percolate_members(
         hdf_save.create_dataset('Morb', data=morb_new)
         hdf_save.create_dataset('Rh_salazar', data=rh, dtype=np.float32)
 
-    return
+    return None
+
+
+def percolate_sub_haloes(path: str) -> None:
+    """Percolates the sub-haloes. If any halo has membership to more than one
+    halo, it is kept in the closest halo and removed from the others. The 
+    measure of distance is phase-space distance:
+
+            d^{2}_{p,h} = |x-x_h|^2 / R200^2 + |v-v_h|^2 / V200^2
+
+    Parameters
+    ----------
+    path : str
+        Location from where to load the file
+
+    Returns
+    -------
+    None
+    """
+    # Load halo members. HID: OPID, dph, row_idx
+    members = {}
+    with h5.File(path + 'dynamical_halo_members_sub_haloes.hdf5', 'r') as hdf:
+        for hid in tqdm(hdf.keys(), ncols=100, desc='Reading data', colour='blue'):
+            members[int(hid)] = {
+                'OHID': hdf[f'{hid}/OHID'][()],
+                'dph': hdf[f'{hid}/dph'][()],
+                'row_idx': hdf[f'{hid}/row_idx'][()]
+            }
+
+    # Reverse the members dictionary. PID: HID and PID: dph
+    reversed_members = defaultdict(list)
+    reversed_members_dph = defaultdict(list)
+
+    for key in tqdm(members.keys(), ncols=100, desc='Reversing dicts', colour='blue'):
+        for i, item in enumerate(members[key]['OHID']):
+            reversed_members[item].append(key)
+            reversed_members_dph[item].append(members[key]['dph'][i])
+
+    # Look for repeated members
+    repeated_members = []
+    for key, item in reversed_members.items():
+        if len(item) > 1:
+            repeated_members.append(key)
+
+    # Create a dictionary with the particles to remove per halo. HID: PID
+    pids_to_remove = defaultdict(list)
+    for item in tqdm(repeated_members, ncols=100, desc='Selecting OHIDs', colour='blue'):
+        current_pid = np.array(reversed_members[item])
+        current_dph = np.array(reversed_members_dph[item])
+        loc_min = np.argmin(current_dph)
+        mask_remove = current_dph != current_dph[loc_min]
+
+        for hid in current_pid[mask_remove]:
+            pids_to_remove[hid].append(item)
+
+    # Create a new members catalogue, removing particles form haloes.
+    new_members = {}
+    for key in tqdm(members.keys(), ncols=100, desc='Removing members', colour='blue'):
+        if key in pids_to_remove.keys():
+            pid_remove = pids_to_remove[key]
+            mask_keep = ~np.isin(
+                members[key]['OHID'], pid_remove, assume_unique=True)
+            if mask_keep.sum() == len(pid_remove):
+                continue
+            new_members[key] = {
+                'OHID': members[key]['OHID'][mask_keep],
+                'row_idx': members[key]['row_idx'][mask_keep],
+            }
+        else:
+            new_members[key] = {
+                'OHID': members[key]['OHID'],
+                'row_idx': members[key]['row_idx'],
+            }
+
+    # Save new members catalogue
+    with h5.File(path + 'dynamical_halo_members_sub_haloes_percolated.hdf5', 'w') as hdf:
+        for hid in tqdm(new_members.keys(), ncols=100, desc='Saving members', colour='blue'):
+            hdf.create_dataset(f'{hid}/OHID', data=new_members[hid]['OHID'])
+            hdf.create_dataset(
+                f'{hid}/row_idx', data=new_members[hid]['row_idx'])
+    return None
 
 
 if __name__ == "__main__":
