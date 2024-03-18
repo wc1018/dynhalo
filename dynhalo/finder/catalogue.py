@@ -383,11 +383,11 @@ def percolate_members(
     # Load halo members. HID: PID, dph, row_idx
     members = {}
     with h5.File(path + 'dynamical_halo_members.hdf5', 'r') as hdf:
-        for hid in tqdm(hdf['members/part'].keys(), ncols=100, desc='Reading data', colour='blue'):
+        for hid in tqdm(hdf.keys(), ncols=100, desc='Reading data', colour='blue'):
             members[int(hid)] = {
-                'PID': hdf[f'members/part/{hid}/PID'][()],
-                'dph': hdf[f'members/part/{hid}/dph'][()],
-                'row_idx': hdf[f'members/part/{hid}/row_idx'][()]
+                'PID': hdf[f'{hid}/PID'][()],
+                'dph': hdf[f'{hid}/dph'][()],
+                'row_idx': hdf[f'{hid}/row_idx'][()]
             }
 
     # Reverse the members dictionary. PID: HID and PID: dph
@@ -444,7 +444,7 @@ def percolate_members(
     with h5.File(path + 'dynamical_halo_catalogue.hdf5', 'r') as hdf:
         ohid = hdf['OHID'][()]
     morb_new = np.zeros(len(ohid), dtype=np.float64)
-    for i, hid in enumerate(tqdm(ohid, ncols=100, desc='Saving members', colour='blue')):
+    for i, hid in enumerate(tqdm(ohid, ncols=100, desc='Saving catalogue', colour='blue')):
         morb_new[i] = part_mass * len(new_members[hid]['PID'])
     rh = 0.8403 * (morb_new/1e14)**0.226
 
