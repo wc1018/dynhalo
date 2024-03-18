@@ -249,11 +249,11 @@ def classify_seeds_in_sub_box(
         if len(halo_subs.keys()) > 0:
             for item in halo_subs.keys():
                 hdf.create_dataset(f'members/halo/{str(item)}/OHID',
-                                    data=halo_subs[item]['OHID'])
+                                   data=halo_subs[item]['OHID'])
                 hdf.create_dataset(f'members/halo/{str(item)}/row_idx',
-                                    data=halo_subs[item]['row_idx'])
+                                   data=halo_subs[item]['row_idx'])
                 hdf.create_dataset(f'members/halo/{str(item)}/dph',
-                                    data=halo_subs[item]['dph'])
+                                   data=halo_subs[item]['dph'])
 
     return None
 
@@ -269,6 +269,33 @@ def generate_full_box_catalogue(
     subsize: float,
     padding: float = 5.0,
 ) -> None:
+    """Generates a halo catalogue using the kinetic mass criterion to classify
+    particles into orbiting or infalling.
+
+    Parameters
+    ----------
+    path : str
+        Location from where to load the file
+    n_threads : int
+        Number of threads
+    min_num_part : int
+        Minimum number of particles needed to be considered a halo
+    part_mass : float
+        Mass per particle
+    rhom : float
+        Matter density of the universe
+    boxsize : float
+        Size of simulation box
+    subsize : float
+        Size of sub-box
+    padding : float, optional
+        Only particles up to this distance from the sub-box edge are considered 
+        for classification. Defaults to 5
+
+    Returns
+    -------
+    None
+    """
     # Create directory if it does not exist
     save_path = path + 'sub_box_catalogues/'
     if not os.path.exists(save_path):
@@ -340,17 +367,29 @@ def percolate_members(
     path: str,
     part_mass: float,
 ) -> None:
+    """Percolates the halo catalogue. If any particle has membership to more 
+    than one halo, it is kept in he closest halo and removed from the others.
+    The measure of distance is phase-space distance:
     
+            d^{2}_{p,h} = |x-x_h|^2 / R200^2 + |v-v_h|^2 / V200^2
+
+    Parameters
+    ----------
+    path : str
+        Location from where to load the file
+    part_mass : float
+        Mass per particle
+    """
     # Load halo members. HID: PID, dph, row_idx
     members = {}
-    with h5.File(path + 'dynamical_halo_members.hdf5', 'w') as hdf:
+    with h5.File(path + 'dynamical_halo_members.hdf5', 'r') as hdf:
         for hid in tqdm(hdf['members/part'].keys(), ncols=100, desc='Reading data', colour='blue'):
             members[int(hid)] = {
                 'PID': hdf[f'members/part/{hid}/PID'][()],
                 'dph': hdf[f'members/part/{hid}/dph'][()],
                 'row_idx': hdf[f'members/part/{hid}/row_idx'][()]
             }
-    
+
     # Reverse the members dictionary. PID: HID and PID: dph
     reversed_members = defaultdict(list)
     reversed_members_dph = defaultdict(list)
@@ -382,16 +421,15 @@ def percolate_members(
     for key in tqdm(members.keys(), ncols=100, desc='Removing members', colour='blue'):
         if key in pids_to_remove.keys():
             pid_remove = pids_to_remove[key]
-            mask_keep = ~np.isin(members[key]['PID'], pid_remove, assume_unique=True)
+            mask_keep = ~np.isin(
+                members[key]['PID'], pid_remove, assume_unique=True)
             new_members[key] = {
                 'PID': members[key]['PID'][mask_keep],
-                # 'dph': members[key]['dph'][mask_keep],
                 'row_idx': members[key]['row_idx'][mask_keep],
             }
         else:
             new_members[key] = {
                 'PID': members[key]['PID'],
-                # 'dph': members[key]['dph'],
                 'row_idx': members[key]['row_idx'],
             }
 
@@ -399,8 +437,8 @@ def percolate_members(
     with h5.File(path + 'dynamical_halo_members_percolated.hdf5', 'w') as hdf:
         for hid in tqdm(new_members.keys(), ncols=100, desc='Saving members', colour='blue'):
             hdf.create_dataset(f'{hid}/PID', data=new_members[hid]['PID'])
-            # hdf.create_dataset(f'{hid}/dph', data=new_members[hid]['dph'])
-            hdf.create_dataset(f'{hid}/row_idx', data=new_members[hid]['row_idx'])
+            hdf.create_dataset(
+                f'{hid}/row_idx', data=new_members[hid]['row_idx'])
 
     # Recompute Morb
     with h5.File(path + 'dynamical_halo_catalogue.hdf5', 'r') as hdf:
@@ -408,14 +446,16 @@ def percolate_members(
     morb_new = np.zeros(len(ohid), dtype=np.float64)
     for i, hid in enumerate(tqdm(ohid, ncols=100, desc='Saving members', colour='blue')):
         morb_new[i] = part_mass * len(new_members[hid]['PID'])
+    rh = 0.8403 * (morb_new/1e14)**0.226
 
     with h5.File(path + 'dynamical_halo_catalogue.hdf5', 'r') as hdf, \
-        h5.File(path + 'dynamical_halo_catalogue_percolated.hdf5', 'w') as hdf_save:
+            h5.File(path + 'dynamical_halo_catalogue_percolated.hdf5', 'w') as hdf_save:
         for item in hdf.keys():
-            if item == 'Morb': 
+            if item == 'Morb':
                 continue
             hdf_save.create_dataset(item, data=hdf[item])
         hdf_save.create_dataset('Morb', data=morb_new)
+        hdf_save.create_dataset('Rh_salazar', data=rh)
 
     return
 
