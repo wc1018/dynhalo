@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from functools import partial
 from multiprocessing import Pool
 from typing import List, Tuple, Union
@@ -190,20 +191,6 @@ def classify_seeds_in_sub_box(
         orb_arg = row_part[mask_orb][row_idx_order]
         orb_dph = dphsq[mask_orb][row_idx_order]
 
-        # Classify seeds =======================================================
-        rel_pos = relative_coordinates(pos_seed[i], pos_seed_adj, boxsize)
-        rel_vel = vel_seed_adj - vel_seed[i]
-        # Classify
-        mask_orb_seed = classify(rel_pos, rel_vel, r200, m200, pars)
-        # Compute phase space distance from particle to halo
-        dphsq = np.sum(np.square(rel_pos), axis=1) / r200**2 + \
-            np.sum(np.square(rel_vel), axis=1) / v200sq
-        # Select orbiting particles' PID
-        row_idx_order = np.argsort(row_seed_adj[mask_orb_seed])
-        orb_pid_seed = hid_seed_adj[mask_orb_seed][row_idx_order]
-        orb_arg_seed = row_seed_adj[mask_orb_seed][row_idx_order]
-        orb_dph_seed = dphsq[mask_orb_seed][row_idx_order]
-
         # Append halo to halo catalogue if there are at least min_dm_part
         # orbiting particles
         haloes.loc[len(haloes.index)] = [
@@ -218,7 +205,24 @@ def classify_seeds_in_sub_box(
                                      'row_idx': orb_arg,
                                      'dph': orb_dph}
 
+        # Classify seeds =======================================================
+        mask_self = hid_seed_adj != hid_seed[i]
+        rel_pos = relative_coordinates(
+            pos_seed[i], pos_seed_adj[mask_self], boxsize)
+        rel_vel = vel_seed_adj[mask_self] - vel_seed[i]
+        # Classify
+        mask_orb_seed = classify(rel_pos, rel_vel, r200, m200, pars)
+
         if mask_orb_seed.sum() > 0:
+            # Compute phase space distance from particle to halo
+            dphsq = np.sum(np.square(rel_pos), axis=1) / r200**2 + \
+                np.sum(np.square(rel_vel), axis=1) / v200sq
+            # Select orbiting particles' PID
+            row_idx_order = np.argsort(row_seed_adj[mask_self][mask_orb_seed])
+            orb_pid_seed = hid_seed_adj[mask_self][mask_orb_seed][row_idx_order]
+            orb_arg_seed = row_seed_adj[mask_self][mask_orb_seed][row_idx_order]
+            orb_dph_seed = dphsq[mask_orb_seed][row_idx_order]
+
             halo_subs[hid_seed[i]] = {'OHID': orb_pid_seed,
                                       'row_idx': orb_arg_seed,
                                       'dph': orb_dph_seed}
@@ -242,14 +246,14 @@ def classify_seeds_in_sub_box(
             hdf.create_dataset(f'members/part/{str(item)}/dph',
                                data=halo_members[item]['dph'])
         # Save halo members (seed)
-        if mask_orb_seed.sum() > 0:
+        if len(halo_subs.keys()) > 0:
             for item in halo_subs.keys():
                 hdf.create_dataset(f'members/halo/{str(item)}/OHID',
-                                   data=halo_subs[item]['OHID'])
+                                    data=halo_subs[item]['OHID'])
                 hdf.create_dataset(f'members/halo/{str(item)}/row_idx',
-                                   data=halo_subs[item]['row_idx'])
+                                    data=halo_subs[item]['row_idx'])
                 hdf.create_dataset(f'members/halo/{str(item)}/dph',
-                                   data=halo_subs[item]['dph'])
+                                    data=halo_subs[item]['dph'])
 
     return None
 
@@ -257,7 +261,7 @@ def classify_seeds_in_sub_box(
 @timer
 def generate_full_box_catalogue(
     path: str,
-    nthreads: int,
+    n_threads: int,
     min_num_part: int,
     part_mass: float,
     rhom: float,
@@ -276,12 +280,130 @@ def generate_full_box_catalogue(
                    part_mass=part_mass, rhom=rhom, boxsize=boxsize,
                    subsize=subsize, path=path, padding=padding)
 
-    with Pool(nthreads) as pool:
+    with Pool(n_threads) as pool:
         list(tqdm(pool.imap(func, range(n_sub_boxes)),
                   total=n_sub_boxes, colour="green", ncols=100,
                   desc='Generating halo catalogue'))
 
+    # Consolidate catalogue
+    m200_all, morb, ohid, r200m, pos, vel = ([] for _ in range(6))
+    members = {}
+    members_seed = {}
+    for i in tqdm(range(n_sub_boxes), ncols=100, desc='Reading data', colour='blue'):
+        with h5.File(save_path + f'{i}.hdf5', 'r') as hdf:
+            m200_all.append(hdf['halo/M200m_all'][()])
+            morb.append(hdf['halo/Morb'][()])
+            ohid.append(hdf['halo/OHID'][()])
+            r200m.append(hdf['halo/R200m'][()])
+            pos.append(hdf['halo/pos'][()])
+            vel.append(hdf['halo/vel'][()])
+            for hid in hdf['members/part'].keys():
+                members[hid] = {
+                    'PID': hdf[f'members/part/{hid}/PID'][()],
+                    'dph': hdf[f'members/part/{hid}/dph'][()],
+                    'row_idx': hdf[f'members/part/{hid}/row_idx'][()],
+                }
+            if 'halo' in hdf['members'].keys():
+                for hid in hdf['members/halo'].keys():
+                    members_seed[hid] = {
+                        'OHID': hdf[f'members/halo/{hid}/OHID'][()],
+                        'dph': hdf[f'members/halo/{hid}/dph'][()],
+                        'row_idx': hdf[f'members/halo/{hid}/row_idx'][()],
+                    }
+
+    with h5.File(path + 'dynamical_halo_catalogue.hdf5', 'w') as hdf:
+        hdf.create_dataset('M200m_all', data=np.concatenate(m200_all))
+        hdf.create_dataset('Morb', data=np.concatenate(morb))
+        hdf.create_dataset('OHID', data=np.concatenate(ohid))
+        hdf.create_dataset('R200m', data=np.concatenate(r200m))
+        hdf.create_dataset('pos', data=np.concatenate(pos))
+        hdf.create_dataset('vel', data=np.concatenate(vel))
+
+    with h5.File(path + 'dynamical_halo_members.hdf5', 'w') as hdf:
+        for hid in members.keys():
+            hdf.create_dataset(f'{hid}/PID', data=members[hid]['PID'])
+            hdf.create_dataset(f'{hid}/dph', data=members[hid]['dph'])
+            hdf.create_dataset(f'{hid}/row_idx', data=members[hid]['row_idx'])
+
+    with h5.File(path + 'dynamical_halo_members_sub_haloes.hdf5', 'w') as hdf:
+        for hid in members.keys():
+            hdf.create_dataset(f'{hid}/OHID', data=members_seed[hid]['OHID'])
+            hdf.create_dataset(f'{hid}/dph', data=members_seed[hid]['dph'])
+            hdf.create_dataset(
+                f'{hid}/row_idx', data=members_seed[hid]['row_idx'])
+
     return None
+
+
+@timer
+def percolate_members(
+    path: str,
+    boxsize: float,
+    subsize: float,
+) -> None:
+    
+    # Load halo members. HID: PID, dph, row_idx
+    members = {}
+    with h5.File(path + 'dynamical_halo_members.hdf5', 'w') as hdf:
+        for hid in tqdm(hdf['members/part'].keys(), ncols=100, desc='Reading data', colour='blue'):
+            members[int(hid)] = {
+                'PID': hdf[f'members/part/{hid}/PID'][()],
+                'dph': hdf[f'members/part/{hid}/dph'][()],
+                'row_idx': hdf[f'members/part/{hid}/row_idx'][()]
+            }
+    
+    # Reverse the members dictionary. PID: HID and PID: dph
+    reversed_members = defaultdict(list)
+    reversed_members_dph = defaultdict(list)
+
+    for key in tqdm(members.keys()):
+        for i, item in enumerate(members[key]['PID']):
+            reversed_members[item].append(key)
+            reversed_members_dph[item].append(members[key]['dph'][i])
+
+    # Look for repeated members
+    repeated_members = []
+    for key, item in reversed_members.items():
+        if len(item) > 1:
+            repeated_members.append(key)
+
+    # Create a dictionary with the particles to remove per halo. HID: PID
+    pids_to_remove = defaultdict(list)
+    for item in tqdm(repeated_members):
+        current_pid = np.array(reversed_members[item])
+        current_dph = np.array(reversed_members_dph[item])
+        loc_min = np.argmin(current_dph)
+        mask_remove = current_dph != current_dph[loc_min]
+
+        for hid in current_pid[mask_remove]:
+            pids_to_remove[hid].append(item)
+
+    # Create a new members catalogue, removing particles form haloes.
+    new_members = {}
+    for key in tqdm(members.keys()):
+        if key in pids_to_remove.keys():
+            pid_remove = pids_to_remove[key]
+            mask_keep = ~np.isin(members[key]['PID'], pid_remove, assume_unique=True)
+            new_members[key] = {
+                'PID': members[key]['PID'][mask_keep],
+                # 'dph': members[key]['dph'][mask_keep],
+                'row_idx': members[key]['row_idx'][mask_keep],
+            }
+        else:
+            new_members[key] = {
+                'PID': members[key]['PID'],
+                # 'dph': members[key]['dph'],
+                'row_idx': members[key]['row_idx'],
+            }
+
+    # Save new members catalogue
+    with h5.File(path + 'dynamical_halo_members_percolated.hdf5', 'w') as hdf:
+        for hid in new_members.keys():
+            hdf.create_dataset(f'{hid}/PID', data=new_members[hid]['PID'])
+            # hdf.create_dataset(f'{hid}/dph', data=new_members[hid]['dph'])
+            hdf.create_dataset(f'{hid}/row_idx', data=new_members[hid]['row_idx'])
+
+    return
 
 
 if __name__ == "__main__":
