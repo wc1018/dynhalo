@@ -320,13 +320,13 @@ def generate_full_box_catalogue(
         hdf.create_dataset('vel', data=np.concatenate(vel))
 
     with h5.File(path + 'dynamical_halo_members.hdf5', 'w') as hdf:
-        for hid in members.keys():
+        for hid in tqdm(members.keys(), ncols=100, desc='Saving members', colour='green'):
             hdf.create_dataset(f'{hid}/PID', data=members[hid]['PID'])
             hdf.create_dataset(f'{hid}/dph', data=members[hid]['dph'])
             hdf.create_dataset(f'{hid}/row_idx', data=members[hid]['row_idx'])
 
     with h5.File(path + 'dynamical_halo_members_sub_haloes.hdf5', 'w') as hdf:
-        for hid in members.keys():
+        for hid in tqdm(members_seed.keys(), ncols=100, desc='Saving subhaloes', colour='green'):
             hdf.create_dataset(f'{hid}/OHID', data=members_seed[hid]['OHID'])
             hdf.create_dataset(f'{hid}/dph', data=members_seed[hid]['dph'])
             hdf.create_dataset(
@@ -338,8 +338,7 @@ def generate_full_box_catalogue(
 @timer
 def percolate_members(
     path: str,
-    boxsize: float,
-    subsize: float,
+    part_mass: float,
 ) -> None:
     
     # Load halo members. HID: PID, dph, row_idx
@@ -356,7 +355,7 @@ def percolate_members(
     reversed_members = defaultdict(list)
     reversed_members_dph = defaultdict(list)
 
-    for key in tqdm(members.keys()):
+    for key in tqdm(members.keys(), ncols=100, desc='Reversing dicts', colour='blue'):
         for i, item in enumerate(members[key]['PID']):
             reversed_members[item].append(key)
             reversed_members_dph[item].append(members[key]['dph'][i])
@@ -369,7 +368,7 @@ def percolate_members(
 
     # Create a dictionary with the particles to remove per halo. HID: PID
     pids_to_remove = defaultdict(list)
-    for item in tqdm(repeated_members):
+    for item in tqdm(repeated_members, ncols=100, desc='Selecting PIDs', colour='blue'):
         current_pid = np.array(reversed_members[item])
         current_dph = np.array(reversed_members_dph[item])
         loc_min = np.argmin(current_dph)
@@ -380,7 +379,7 @@ def percolate_members(
 
     # Create a new members catalogue, removing particles form haloes.
     new_members = {}
-    for key in tqdm(members.keys()):
+    for key in tqdm(members.keys(), ncols=100, desc='Removing members', colour='blue'):
         if key in pids_to_remove.keys():
             pid_remove = pids_to_remove[key]
             mask_keep = ~np.isin(members[key]['PID'], pid_remove, assume_unique=True)
@@ -398,10 +397,25 @@ def percolate_members(
 
     # Save new members catalogue
     with h5.File(path + 'dynamical_halo_members_percolated.hdf5', 'w') as hdf:
-        for hid in new_members.keys():
+        for hid in tqdm(new_members.keys(), ncols=100, desc='Saving members', colour='blue'):
             hdf.create_dataset(f'{hid}/PID', data=new_members[hid]['PID'])
             # hdf.create_dataset(f'{hid}/dph', data=new_members[hid]['dph'])
             hdf.create_dataset(f'{hid}/row_idx', data=new_members[hid]['row_idx'])
+
+    # Recompute Morb
+    with h5.File(path + 'dynamical_halo_catalogue.hdf5', 'r') as hdf:
+        ohid = hdf['OHID'][()]
+    morb_new = np.zeros(len(ohid), dtype=np.float64)
+    for i, hid in enumerate(tqdm(ohid, ncols=100, desc='Saving members', colour='blue')):
+        morb_new[i] = part_mass * len(new_members[hid]['PID'])
+
+    with h5.File(path + 'dynamical_halo_catalogue.hdf5', 'r') as hdf, \
+        h5.File(path + 'dynamical_halo_catalogue_percolated.hdf5', 'w') as hdf_save:
+        for item in hdf.keys():
+            if item == 'Morb': 
+                continue
+            hdf_save.create_dataset(item, data=hdf[item])
+        hdf_save.create_dataset('Morb', data=morb_new)
 
     return
 
