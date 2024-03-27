@@ -436,19 +436,11 @@ def percolate_sub_haloes(path: str) -> None:
                 'row_idx': members[key]['row_idx'],
             }
 
-    # Reverse new members to remove sub-haloes from the parent halo list
-    reversed_members = defaultdict(list)
-    new_members_hids = new_members.keys()
-    for key in tqdm(new_members_hids, ncols=100, desc='Reversing dicts again', colour='blue'):
-        for i, item in enumerate(new_members[key]['OHID']):
-            reversed_members[item].append(key)
-    hids_to_ignore = reversed_members.keys()
     # Save new members catalogue
+    new_members_hids = new_members.keys()
     with h5.File(path + 'dynamical_halo_members_sub_haloes_percolated.hdf5', 'w') as hdf:
         for hid in tqdm(new_members_hids, ncols=100, desc='Saving members', colour='blue'):
             # If the HID is a member of another, then it is not a parent halo
-            if hid in hids_to_ignore:
-                continue
             hdf.create_dataset(f'{hid}/OHID', data=new_members[hid]['OHID'])
             hdf.create_dataset(
                 f'{hid}/row_idx', data=new_members[hid]['row_idx'])
