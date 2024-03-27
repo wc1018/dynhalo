@@ -387,59 +387,63 @@ def percolate_sub_haloes(path: str) -> None:
                 'dph': hdf[f'{hid}/dph'][()],
                 'row_idx': hdf[f'{hid}/row_idx'][()]
             }
-    members_hids = members.keys()
+    members_keys = members.keys()
 
     # Reverse the members dictionary. PID: HID and PID: dph
-    reversed_members = defaultdict(list)
-    reversed_members_dph = defaultdict(list)
+    members_rev = defaultdict(list)
+    dph_rev = defaultdict(list)
 
-    for key in tqdm(members_hids, ncols=100, desc='Reversing dicts', colour='blue'):
-        for i, item in enumerate(members[key]['OHID']):
-            reversed_members[item].append(key)
-            reversed_members_dph[item].append(members[key]['dph'][i])
+    for hid in tqdm(members_keys, ncols=100, desc='Reversing dicts', colour='blue'):
+        for i, sub_hid in enumerate(members[hid]['OHID']):
+            members_rev[sub_hid].append(hid)
+            dph_rev[sub_hid].append(members[hid]['dph'][i])
 
     # Look for repeated members
     repeated_members = []
-    for key, item in tqdm(reversed_members.items(), ncols=100,
-                          desc='Looking for repetitions', colour='blue'):
-        if len(item) > 1:
-            repeated_members.append(key)
+    for sub_hid, elements in tqdm(members_rev.items(), ncols=100,
+                                  desc='Looking for repetitions', colour='blue'):
+        if len(elements) > 1:
+            repeated_members.append(sub_hid)
 
     # Create a dictionary with the particles to remove per halo. HID: PID
-    pids_to_remove = defaultdict(list)
-    for item in tqdm(repeated_members, ncols=100, desc='Selecting OHIDs', colour='blue'):
-        current_pid = np.array(reversed_members[item])
-        current_dph = np.array(reversed_members_dph[item])
+    sub_hids_to_remove = defaultdict(list)
+    for sub_hid in tqdm(repeated_members, ncols=100, desc='Selecting OHIDs', colour='blue'):
+        current_sub_hid = np.array(members_rev[sub_hid])
+        current_dph = np.array(dph_rev[sub_hid])
         loc_min = np.argmin(current_dph)
         mask_remove = current_dph != current_dph[loc_min]
 
-        for hid in current_pid[mask_remove]:
-            pids_to_remove[hid].append(item)
-    hids_to_remove = pids_to_remove.keys()
+        for hid in current_sub_hid[mask_remove]:
+            sub_hids_to_remove[hid].append(sub_hid)
+    sub_hids_to_remove_keys = sub_hids_to_remove.keys()
 
     # Create a new members catalogue, removing particles form haloes.
     new_members = {}
-    for key in tqdm(members_hids, ncols=100, desc='Removing members', colour='blue'):
-        if key in hids_to_remove:
-            pid_remove = pids_to_remove[key]
-            mask_keep = ~np.isin(
-                members[key]['OHID'], pid_remove, assume_unique=True)
+    for hid in tqdm(members_keys, ncols=100, desc='Removing members', colour='blue'):
+        if hid in sub_hids_to_remove_keys:
+            pid_remove = sub_hids_to_remove[hid]
+            mask_keep = np.isin(
+                members[hid]['OHID'],
+                pid_remove,
+                assume_unique=True,
+                invert=True
+            )
             if mask_keep.sum() == 0:
                 continue
-            new_members[key] = {
-                'OHID': members[key]['OHID'][mask_keep],
-                'row_idx': members[key]['row_idx'][mask_keep],
+            new_members[hid] = {
+                'OHID': members[hid]['OHID'][mask_keep],
+                'row_idx': members[hid]['row_idx'][mask_keep],
             }
         else:
-            new_members[key] = {
-                'OHID': members[key]['OHID'],
-                'row_idx': members[key]['row_idx'],
+            new_members[hid] = {
+                'OHID': members[hid]['OHID'],
+                'row_idx': members[hid]['row_idx'],
             }
 
     # Save new members catalogue
-    new_members_hids = new_members.keys()
+    new_members_keys = new_members.keys()
     with h5.File(path + 'dynamical_halo_members_sub_haloes_percolated.hdf5', 'w') as hdf:
-        for hid in tqdm(new_members_hids, ncols=100, desc='Saving members', colour='blue'):
+        for hid in tqdm(new_members_keys, ncols=100, desc='Saving members', colour='blue'):
             # If the HID is a member of another, then it is not a parent halo
             hdf.create_dataset(f'{hid}/OHID', data=new_members[hid]['OHID'])
             hdf.create_dataset(
