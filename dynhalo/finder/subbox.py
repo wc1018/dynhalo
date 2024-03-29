@@ -88,7 +88,10 @@ def get_sub_box_id(
     # Shift in each dimension for numbering sub-boxes
     shift = np.array(
         [1, boxes_per_side, boxes_per_side * boxes_per_side], dtype=uint_dtype)
-    return np.int_(np.sum(shift * np.floor(x / subsize), axis=1))
+    if x.ndim > 1:
+        return np.int_(np.sum(shift * np.floor(x / subsize), axis=1))
+    else:
+        return np.int_(np.sum(shift * np.floor(x / subsize)))
 
 
 def get_adjacent_sub_box_ids(
