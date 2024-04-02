@@ -84,7 +84,7 @@ def get_sub_box_id(
     boxes_per_side = np.int_(np.ceil(boxsize / subsize))
     # Determine data type for integer arrays based on the maximum number of
     # elements
-    uint_dtype = get_np_unit_dytpe(boxes_per_side**2)
+    uint_dtype = get_np_unit_dytpe(boxes_per_side**3)
     # Shift in each dimension for numbering sub-boxes
     shift = np.array(
         [1, boxes_per_side, boxes_per_side * boxes_per_side], dtype=uint_dtype)
