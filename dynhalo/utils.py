@@ -12,7 +12,7 @@ import numpy
 __all__ = ["timer, mkdir"]
 
 # Gravitational constant
-G_gravity = 4.3e-09
+G_gravity = 4.3e-09     # Mpc (km/s)^2 / M_sun
 
 @dataclass(frozen=True)
 class COLS:
