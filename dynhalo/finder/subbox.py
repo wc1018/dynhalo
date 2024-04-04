@@ -368,12 +368,14 @@ def _load_sub_box(
         prefix = f'{name}/'
     else:
         prefix = None
-    with h5.File(path + f'sub_boxes/{sub_box_id}.hdf5', 'r') as hdf:
-        pos = hdf[prefix + 'pos'][()]
-        vel = hdf[prefix + 'vel'][()]
-        pid = hdf[prefix + 'ID'][()]
-        row = hdf[prefix + 'row_idx'][()]
-
+    try:
+        with h5.File(path + f'sub_boxes/{sub_box_id}.hdf5', 'r') as hdf:
+            pos = hdf[prefix + 'pos'][()]
+            vel = hdf[prefix + 'vel'][()]
+            pid = hdf[prefix + 'ID'][()]
+            row = hdf[prefix + 'row_idx'][()]
+    except:
+        pos, vel, pid, row = None, None, None, None
     return pos, vel, pid, row
 
 
@@ -488,16 +490,23 @@ def load_seeds(
             subsize=subsize
         )
         # Create empty lists (containers) to save the data from file for each ID
-        pos, vel, pid, row = ([[] for _ in range(len(adj_sub_box_ids)-1)]
-                              for _ in range(4))
+        # pos, vel, pid, row = ([[] for _ in range(len(adj_sub_box_ids)-1)]
+        pos, vel, pid, row = ([] for _ in range(4))
 
         # Load all adjacent boxes
         for i, sub_box in enumerate(adj_sub_box_ids[adj_sub_box_ids!=sub_box_id]):
             if sub_box == sub_box_id:
                 continue
             else:
-                pos[i], vel[i], pid[i], row[i] = _load_sub_box(
+                postemp, veltemp, pidtemp, rowtemp = _load_sub_box(
                     sub_box, path, name='seed')
+                if any([p is None for p in (postemp, veltemp, pidtemp, rowtemp)]):
+                    continue
+                else:
+                    pos.append(postemp)
+                    vel.append(veltemp)
+                    pid.append(pidtemp)
+                    row.append(rowtemp)
         # Concatenate into a single array
         pos = np.concatenate(pos)
         vel = np.concatenate(vel)
