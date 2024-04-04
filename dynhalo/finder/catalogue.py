@@ -250,7 +250,10 @@ def classify_seeds_in_sub_box(
                                       'row_idx': orb_arg_seed,
                                       'dph': orb_dph_seed,
                                       'dph2': orb_dph2_seed}
-
+    
+    if len(haloes.index) < 1:
+        return None
+    
     # Save catalogue
     with h5.File(save_path + f'{sub_box_id}.hdf5', 'w') as hdf:
         # Save halo catalogue
@@ -345,8 +348,9 @@ def generate_full_box_catalogue(
     m200_all, morb, ohid, r200m, pos, vel = ([] for _ in range(6))
     members = {}
     members_seed = {}
-    for i in tqdm(range(n_sub_boxes), ncols=100, desc='Reading data', colour='blue'):
-        with h5.File(save_path + f'{i}.hdf5', 'r') as hdf:
+    files = os.listdir(save_path)
+    for f in tqdm(files, ncols=100, desc='Reading data', colour='blue'):
+        with h5.File(save_path + f, 'r') as hdf:
             m200_all.append(hdf['halo/M200m_all'][()])
             morb.append(hdf['halo/Morb'][()])
             ohid.append(hdf['halo/OHID'][()])
