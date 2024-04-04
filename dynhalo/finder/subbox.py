@@ -497,14 +497,14 @@ def load_seeds(
                 continue
             else:
                 pos[i], vel[i], pid[i], row[i] = _load_sub_box(
-                    sub_box, path, name='part')
+                    sub_box, path, name='seed')
         # Concatenate into a single array
         pos = np.concatenate(pos)
         vel = np.concatenate(vel)
         pid = np.concatenate(pid)
         row = np.concatenate(row)
 
-        # Mask particles within a padding distance of the edge of the box in each
+        # Mask seeds within a padding distance of the edge of the box in each
         # direction
         loc_id = grid_ids == sub_box_id
         padded_distance = 0.5 * subsize + padding
