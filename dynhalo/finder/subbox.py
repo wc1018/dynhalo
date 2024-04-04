@@ -494,12 +494,13 @@ def load_seeds(
         pos, vel, pid, row = ([] for _ in range(4))
 
         # Load all adjacent boxes
-        for i, sub_box in enumerate(adj_sub_box_ids[adj_sub_box_ids!=sub_box_id]):
+        for sub_box in adj_sub_box_ids[adj_sub_box_ids!=sub_box_id]:
             if sub_box == sub_box_id:
                 continue
             else:
                 postemp, veltemp, pidtemp, rowtemp = _load_sub_box(
                     sub_box, path, name='seed')
+                # If no seeds where found
                 if any([p is None for p in (postemp, veltemp, pidtemp, rowtemp)]):
                     continue
                 else:
