@@ -501,7 +501,7 @@ def load_seeds(
                 postemp, veltemp, pidtemp, rowtemp = _load_sub_box(
                     sub_box, path, name='seed')
                 # If no seeds where found
-                if any([p is None for p in (postemp, veltemp, pidtemp, rowtemp)]):
+                if not all((postemp, veltemp, pidtemp, rowtemp)):
                     continue
                 else:
                     pos.append(postemp)

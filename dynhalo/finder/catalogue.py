@@ -155,6 +155,9 @@ def classify_seeds_in_sub_box(
     # Load seeds
     pos_seed, vel_seed, hid_seed, row_seed = load_seeds(sub_box_id, boxsize,
                                                         subsize, path, padding)
+    if not any((pos_seed, vel_seed, hid_seed, row_seed)):
+        return None
+    
     n_seeds = len(hid_seed)
     # Load adjacent seeds
     pos_seed_adj, vel_seed_adj, hid_seed_adj, row_seed_adj = load_seeds(
