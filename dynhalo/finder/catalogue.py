@@ -311,8 +311,6 @@ def generate_full_box_catalogue(
     ----------
     path : str
         Location from where to load the file
-    n_threads : int
-        Number of threads
     min_num_part : int
         Minimum number of particles needed to be considered a halo
     part_mass : float
@@ -326,6 +324,8 @@ def generate_full_box_catalogue(
     padding : float, optional
         Only particles up to this distance from the sub-box edge are considered 
         for classification. Defaults to 5
+    n_threads : int
+        Number of threads
 
     Returns
     -------
