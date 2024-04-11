@@ -88,6 +88,10 @@ def get_sub_box_id(
     # Shift in each dimension for numbering sub-boxes
     shift = np.array(
         [1, boxes_per_side, boxes_per_side * boxes_per_side], dtype=uint_dtype)
+    # In the rare case an object is located exactly at the edge of the box,
+    # move it 'inwards' by a tiny amount so that the box id is correct.
+    x[np.where(x==boxsize)] -= 1e-8
+    x[np.where(x==0)] += 1e-8
     if x.ndim > 1:
         return np.int_(np.sum(shift * np.floor(x / subsize), axis=1))
     else:
@@ -185,6 +189,8 @@ def generate_sub_box_ids(
         else:
             upp = None
         ids[low:upp] = get_sub_box_id(positions[low:upp], boxsize, subsize)
+        # if np.max(ids) > boxes_per_side**3:
+            # print(chunk)
 
     if name:
         file_name = f'sub_box_id_{name}.hdf5'
