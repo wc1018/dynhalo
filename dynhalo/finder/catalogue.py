@@ -487,13 +487,14 @@ def generate_full_box_catalogue(
     files = os.listdir(save_path)
     for f in tqdm(files, ncols=100, desc='Consolidating catalogue', colour='green'):
         with h5.File(save_path+f, 'r') as hdf:
-            m200m.append(hdf['halo/M200m'][()])
-            r200m.append(hdf['halo/R200m'][()])
-            morb.append(hdf['halo/Morb'][()])
-            ohid.append(hdf['halo/OHID'][()])
-            pos.append(hdf['halo/pos'][()])
-            vel.append(hdf['halo/vel'][()])
-            pid.append(hdf['halo/PID'][()])
+            if 'halo' in hdf.key():
+                m200m.append(hdf['halo/M200m'][()])
+                r200m.append(hdf['halo/R200m'][()])
+                morb.append(hdf['halo/Morb'][()])
+                ohid.append(hdf['halo/OHID'][()])
+                pos.append(hdf['halo/pos'][()])
+                vel.append(hdf['halo/vel'][()])
+                pid.append(hdf['halo/PID'][()])
 
     ohid = np.concatenate(ohid)
     _, index = np.unique(ohid, return_index=True)
@@ -511,11 +512,12 @@ def generate_full_box_catalogue(
     with h5.File(path + 'halo_members.hdf5', 'w') as hdf:
         for f in tqdm(files, ncols=100, desc='Consolidating members', colour='green'):
             with h5.File(save_path+f, 'r') as hdf_load:
-                for hid in hdf_load['members/part'].keys():
-                    hdf.create_dataset(
-                        f'{hid}/PID', data=hdf_load[f'members/part/{hid}/PID'][()])
-                    hdf.create_dataset(
-                        f'{hid}/row_idx', data=hdf_load[f'members/part/{hid}/row_idx'][()])
+                if 'members' in hdf.key():
+                    for hid in hdf_load['members/part'].keys():
+                        hdf.create_dataset(
+                            f'{hid}/PID', data=hdf_load[f'members/part/{hid}/PID'][()])
+                        hdf.create_dataset(
+                            f'{hid}/row_idx', data=hdf_load[f'members/part/{hid}/row_idx'][()])
 
     return
 
