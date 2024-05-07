@@ -407,7 +407,7 @@ def classify_seeds_in_sub_box(
     # Exit if there are no haloes left
     if mask_mass.sum() < 1:
         return None
-    
+
     haloes = haloes[mask_mass]
     haloes['Morb'] = mass_new[mask_mass]
     haloes['PID'] = pids[mask_in_sb][mask_mass]
