@@ -399,7 +399,7 @@ def find_cs(
     r: np.ndarray, 
     xi: np.ndarray, 
     xi_cov: np.ndarray, 
-    r_min: float = 40, 
+    r_min: float = 25, 
     r_max: float = 80
 ) -> float:
     """Finds the optimal cs value for the given power spectrum
@@ -476,10 +476,10 @@ def xi_large_construct(
     fmu: float = 40.,
     fsig: float = 3.,
 ) -> np.ndarray:
-    """Constructs the function \xi_large for given LTP and Zel'dovich 
+    """Constructs the function xi_large for given LTP and Zel'dovich 
     Approximation models, as a smooth transition between both terms.
 
-    xi_large = (1-f)\xi_zel + f\xi_LTP
+    xi_large = (1-f)xi_zel + fxi_LTP
 
     where f is an error function.
 
