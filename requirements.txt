@@ -1,12 +1,15 @@
 numpy
 h5py
+numba
 tqdm
 pytest
 ipykernel
 matplotlib
 emcee
 chainconsumer
+colossus
 velocileptors @ git+https://github.com/sfschen/velocileptors.git
 ZeNBu @ git+https://github.com/sfschen/ZeNBu.git
 # pylians @ git+https://github.com/franciscovillaescusa/Pylians
 colossus
+pygadgetreader @ git+https://github.com/jveitchmichaelis/pygadgetreader.git
