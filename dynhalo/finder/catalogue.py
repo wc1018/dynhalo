@@ -24,9 +24,12 @@ def find_r200_m200(rel_pos, part_mass, rhom):
     dists.sort()
     mass_prof = part_mass * np.arange(1, len(dists)+1)
     loc = np.argmax(mass_prof / (4 / 3 * np.pi * dists ** 3) <= 200 * rhom)
-    vel_prof_sq = G_gravity * mass_prof / dists
+    loc2 = np.argmax(mass_prof / (4 / 3 * np.pi * dists ** 3) <= 5000 * rhom)
+    # vel_prof_sq = G_gravity * mass_prof / dists
+    argloc = np.argsort(dists)[:loc2]
 
-    return dists[loc], mass_prof[loc], np.max(vel_prof_sq)
+    # return dists[loc], mass_prof[loc], np.max(vel_prof_sq)
+    return dists[loc], mass_prof[loc], dists[loc2], argloc
 
 
 def classify(
@@ -183,12 +186,15 @@ def classify_seeds_in_sub_box(
         # Classify particles ===================================================
         rel_pos = relative_coordinates(pos_seed[i], pos_part, boxsize)
         rel_vel = vel_part - vel_seed[i]
-        r200, m200, vmax = find_r200_m200(rel_pos, part_mass, rhom)
+        # r200, m200, vmax = find_r200_m200(rel_pos, part_mass, rhom)
+        r200, m200, r5000, argloc = find_r200_m200(rel_pos, part_mass, rhom)
         # Classify
         mask_orb = classify(rel_pos, rel_vel, r200, m200, pars)
         # Compute phase space distance from particle to halo
-        sigmax = vmax**2 / (G_gravity * 200 * rhom * 4 * np.pi / 3)
-        sigmav = np.var(rel_vel)
+        # sigmax = vmax**2 / (G_gravity * 200 * rhom * 4 * np.pi / 3)
+        sigmax = r5000**2
+        # sigmav = np.var(rel_vel)
+        sigmav = np.median(np.sum(np.square(rel_vel[argloc]), axis=1))
         dphsq = np.sum(np.square(rel_pos), axis=1) / sigmax + \
             np.sum(np.square(rel_vel), axis=1) / sigmav
 
@@ -397,6 +403,11 @@ def classify_seeds_in_sub_box(
     # Select haloes in subbox
     haloes = haloes_temp[mask_in_sb]
     mask_mass = mass_new > 0
+    
+    # Exit if there are no haloes left
+    if mask_mass.sum() < 1:
+        return None
+    
     haloes = haloes[mask_mass]
     haloes['Morb'] = mass_new[mask_mass]
     haloes['PID'] = pids[mask_in_sb][mask_mass]
@@ -487,7 +498,7 @@ def generate_full_box_catalogue(
     files = os.listdir(save_path)
     for f in tqdm(files, ncols=100, desc='Consolidating catalogue', colour='green'):
         with h5.File(save_path+f, 'r') as hdf:
-            if 'halo' in hdf.key():
+            if 'halo' in hdf.keys():
                 m200m.append(hdf['halo/M200m'][()])
                 r200m.append(hdf['halo/R200m'][()])
                 morb.append(hdf['halo/Morb'][()])
@@ -497,6 +508,7 @@ def generate_full_box_catalogue(
                 pid.append(hdf['halo/PID'][()])
 
     ohid = np.concatenate(ohid)
+    # NOTE: Redundant?
     _, index = np.unique(ohid, return_index=True)
 
     with h5.File(path + 'halo_catalogue.hdf5', 'w') as hdf:
@@ -512,7 +524,7 @@ def generate_full_box_catalogue(
     with h5.File(path + 'halo_members.hdf5', 'w') as hdf:
         for f in tqdm(files, ncols=100, desc='Consolidating members', colour='green'):
             with h5.File(save_path+f, 'r') as hdf_load:
-                if 'members' in hdf.key():
+                if 'members' in hdf_load.keys():
                     for hid in hdf_load['members/part'].keys():
                         hdf.create_dataset(
                             f'{hid}/PID', data=hdf_load[f'members/part/{hid}/PID'][()])

@@ -113,7 +113,7 @@ def _select_particles_around_haloes(
             rel_pos = rel_pos[mask_close]
             rel_vel = vel[mask_close] - vel_seed[mask_seeds_in_sub_box][i]
             # Compute R200 and M200
-            r200, m200 = find_r200_m200(rel_pos, part_mass, rhom)
+            r200, m200, _, _ = find_r200_m200(rel_pos, part_mass, rhom)
             # Compute V200
             v200sq = G_gravity * m200 / r200
             # Compute radial and tangential velocity
