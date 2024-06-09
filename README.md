@@ -38,7 +38,7 @@ $ conda install -c bccp kdcount classylss
 
 It can be done from souce via conda. Follow the installation instructions in the documentation to install `nbodykit`
 ```sh
-$ conda activate dhmenv
+$ conda activate <env name>
 $ conda install -c bccp nbodykit
 ```
 
@@ -58,6 +58,6 @@ $ conda update -c bccp --all
 ## Installation
 Install this package via
 ```sh
-$ git clone https://github.com/edgarmsalazar/Dynamics-Based-Halo-Model
+$ git clone https://github.com/edgarmsalazar/dynhalo.git
 $ pip install .
 ```
