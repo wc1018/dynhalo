@@ -10,6 +10,5 @@ chainconsumer
 colossus
 velocileptors @ git+https://github.com/sfschen/velocileptors.git
 ZeNBu @ git+https://github.com/sfschen/ZeNBu.git
-# pylians @ git+https://github.com/franciscovillaescusa/Pylians
-colossus
+pylians @ git+https://github.com/franciscovillaescusa/Pylians3.git
 pygadgetreader @ git+https://github.com/jveitchmichaelis/pygadgetreader.git
