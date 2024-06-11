@@ -203,6 +203,7 @@ def heaviside_step(
     theta: float,
     phi: float, 
     boxsize: float,
+    n_mesh: int = None
 ) -> bool:
     """Computes the Heaviside step function in spherical coordinates
 
@@ -225,7 +226,17 @@ def heaviside_step(
     y1 = np.abs(lamb * np.sin(theta) * np.cos(phi)) < boxsize
     y2 = np.abs(lamb * np.sin(theta) * np.sin(phi)) < boxsize
     y3 = np.abs(lamb * np.cos(theta)) < boxsize
-    return y1 & y2 & y3
+
+    if n_mesh:
+        # Small modes
+        x1 = np.abs(lamb * np.sin(theta) * np.cos(phi)) > (boxsize / n_mesh)
+        x2 = np.abs(lamb * np.sin(theta) * np.sin(phi)) > (boxsize / n_mesh)
+        x3 = np.abs(lamb * np.cos(theta)) > (boxsize / n_mesh)
+
+        return y1 & y2 & y3 & x1 & x2 & x3
+    
+    else:
+        return y1 & y2 & y3
 
 
 def k_modes_fraction_monte_carlo(
@@ -233,6 +244,7 @@ def k_modes_fraction_monte_carlo(
     theta: np.ndarray,
     phi: np.ndarray, 
     boxsize: float,
+    n_mesh: int = None
 ) -> float:
     """Returns the Monte-Carlo integral of the fraction of wave lengths that fit 
     inside the box across all possible angles
@@ -274,13 +286,14 @@ def k_modes_fraction_monte_carlo(
     float
         Fraction of wave lengths with length `lamb` that fit inside the box.
     """
-    return np.mean(heaviside_step(lamb, theta, phi, boxsize))
+    return np.mean(heaviside_step(lamb, theta, phi, boxsize, n_mesh))
 
 
 def power_spec_box_effect_k_modes(
     k: np.ndarray,
     pk: np.ndarray,
     boxsize: float,
+    n_mesh: int = None,
     n_draws: int = 1_000_000,
     n_modes: int = 500
 ) -> np.ndarray:
@@ -329,7 +342,8 @@ def power_spec_box_effect_k_modes(
                                 lambda_modes,
                                 repeat(thetas, n_modes),
                                 repeat(phis, n_modes),
-                                repeat(boxsize, n_modes)
+                                repeat(boxsize, n_modes),
+                                repeat(n_mesh, n_modes)
                             ))
     frac = np.array(frac)
 
