@@ -1,6 +1,6 @@
 # Dynamics-Based Halo Model
 
-This code reproduces Salazar et. al. (2024) (arxiv:XXXX).
+This code reproduces Salazar et. al. (2024) ([arXiv:2406.04054](http://arxiv.org/abs/2406.04054)).
 
 ## Requirements
 Setting up the environment turned up to be a bit tricky with so many dependencies. The  first thing is to do is install `corrfunc` and make sure multiprocessing is working properly. Then install `NBodyKit` using conda. Finally, you can pip install this repo.
