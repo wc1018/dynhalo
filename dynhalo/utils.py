@@ -3,7 +3,7 @@
 """
 import os
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import timedelta, datetime
 from time import time
 from typing import Callable, List
 
@@ -56,12 +56,18 @@ def timer(procedure: Callable) -> Callable:
     """
 
     def wrapper(*args, **kwargs):
+        now_start = datetime.now()
         start = time()
         return_value = procedure(*args, **kwargs)
+        now_end = datetime.now()
+        print(f"\t{COLS.BOLD}Process:{COLS.ENDC} {COLS.FAIL}{procedure.__name__}{COLS.ENDC}")
+        print(f"\t Start:  " + \
+              f"{COLS.HEADER}{now_start.strftime('%Y-%m-%d %H:%M:%S')}{COLS.ENDC}")
+        print(f"\t Finish: " + \
+              f"{COLS.OKCYAN}{now_end.strftime('%Y-%m-%d %H:%M:%S')}{COLS.ENDC}")
         print(
-            f"\t{COLS.BULLET}{COLS.BOLD}{COLS.WARNING} Elapsed time:{COLS.ENDC} "
-            + f"{COLS.OKCYAN}{timedelta(seconds=time()-start)}{COLS.ENDC} "
-            + f"{COLS.OKGREEN}{procedure.__name__}{COLS.ENDC}"
+            f"\t{COLS.BULLET}{COLS.BOLD}{COLS.OKGREEN} Elapsed time:{COLS.ENDC} "
+            + f"{COLS.WARNING}{timedelta(seconds=time()-start)}{COLS.ENDC} "
         )
         return return_value
 
